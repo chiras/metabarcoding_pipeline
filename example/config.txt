@@ -1,0 +1,4 @@
+refdb="../ref_dbs/rdp_16s_v16.fa"
+refdb="../ref_dbs/ltp_16s_v123.fa"
+hiedb="../ref_dbs/rdp_16s_v16.fa"
+classificationOnly=0
