@@ -27,7 +27,7 @@ If you use this script, please kindly cite this article: https://doi.org/10.1098
 
 2) Check paths to binaries in the script file
 
-3)You also need to add a ```config.txt``` file, where information about databases are stored. An example is in the example directory.
+3) You also need to add a ```config.txt``` file, where information about databases are stored. An example is in the example directory.
 
 Then you are ready to run:
 ```sh
