@@ -10,7 +10,7 @@
 ###################################################################
 
 # Setting paths of required tools
-s=/PATH/TO/SeqFilter
+sf=/PATH/TO/SeqFilter
   # Seqfilter: https://github.com/BioInf-Wuerzburg/SeqFilter
 ps=/PATH/TO/python_scripts
   # USEARCH python scripts: https://drive5.com/python/python_scripts.tar.gz
@@ -170,7 +170,7 @@ for db in "${refDBs[@]}"
     $vsearch --usearch_global zotus.direct.$prevDB.uc.nohit.fasta --db $db --id 0.$threshold --uc zotus.direct.$countdb.uc --fastapairs zotus.direct.$countdb.fasta --strand both --threads $threads 2>  logs/_direct.$countdb.log
 
     grep "^N[[:space:]]" zotus.direct.$countdb.uc | cut -f 9 > zotus.direct.$countdb.uc.nohit
-    $s zotus.merge.fa --ids zotus.direct.$countdb.uc.nohit --out zotus.direct.$countdb.uc.nohit.fasta
+    $sf zotus.merge.fa --ids zotus.direct.$countdb.uc.nohit --out zotus.direct.$countdb.uc.nohit.fasta
     cut -f 9,10 zotus.direct.$countdb.uc  | grep -v "*" | sed "s/[A-Za-z0-9]*;tax=//" >> taxonomy.vsearch
     prevDB=$countdb
   done
