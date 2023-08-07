@@ -1,0 +1,8 @@
+Reference databases can be added here. However for the the workflow to work, these must be ```FASTA``` files with taxonomic annotation in the header. 
+Examples of such files are available here: 
+
+Bacteria and fungi: https://www.drive5.com/usearch/manual/sintax_downloads.html
+Plant ITS2: https://zenodo.org/record/7968519 or Europe only: https://zenodo.org/record/7970046
+
+Manual creation of such databases from NCBI Genbank: https://academic.oup.com/bioinformatics/article/36/8/2630/5697086?login=false
+Manual addition of sequences and curation: https://www.biorxiv.org/content/10.1101/2023.06.12.544582v1
