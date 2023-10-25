@@ -16,8 +16,8 @@ If you use this script, please kindly cite this article: https://doi.org/10.1098
   * Backup Option: Forward read only use in case of bad quality reverse reads
 * Community level processing
   * Dereplication
-  * Denoising
   * ASV generation
+  * Denoising
   * Chimera (de novo) removal
   * Taxonomic classification
     - allows for multiple reference databases (iterative) with decreasing priority
