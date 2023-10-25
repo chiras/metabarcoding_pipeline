@@ -31,9 +31,10 @@ fastq_maxee=1
 fastq_truncee=1.5
 stripleft=0            # in case of adapters
 stripright=0         # in case of adapters
+unoisealpha=2         # default 2
 
 # classification
-threshold=97 # perc identity threshold for classification
+tax_threshold=97 # perc identity threshold for classification
 sintax_cutoff=0.9
 
 # Paths to binaries
