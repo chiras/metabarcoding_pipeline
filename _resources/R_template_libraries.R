@@ -1,4 +1,6 @@
 ################################################
+# Clear workspace
+rm(list = ls())
 
 # Loading in necessary libraries
 library(phyloseq)
