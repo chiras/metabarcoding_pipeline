@@ -1,6 +1,3 @@
-# Clear workspace
-rm(list = ls())
-
 # Loading in data
 ## Taxonomy
 data.tax <- tax_table(as.matrix(read.table("taxonomy.vsearch", header=T,row.names=1,fill=T,sep=",")))
