@@ -132,6 +132,7 @@ fi #end skippp
   $vsearch --cluster_unoise  all.merge.derep.fa \
     --sizein --sizeout \
     --relabel ASV \
+    --unoise_alpha unoisealpha \
     --centroids zotus.merge_chim.fa \
     --threads $threads 2> logs/_unoise.log
 
