@@ -125,8 +125,7 @@ fi #end skippp
     --sizeout \
     --fasta_width 0 \
     --uc all.merge.derep.uc \
-    --output all.merge.derep.fa \
-    --threads $threads 2> logs/_derep.log
+    --output all.merge.derep.fa 2> logs/_derep.log
 
   echo "-- denoise"
   $vsearch --cluster_unoise  all.merge.derep.fa \
