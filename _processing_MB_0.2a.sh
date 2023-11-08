@@ -297,21 +297,25 @@ cut -f1,4 zotus.uc.merge.nohit.sintax | sed -E -e "s/\_[0-9]+//g" -e "s/,s:.*$//
 
 echo "-- polishing and copying output files"
 
-sed -i .bak -e "s/c:.*,o:/o:/g" -e "s/,[A-Za-z0-9_-]*;tax=//" -e "s/	/,/"  -e "s/,.*k:/,k:/" taxonomy.vsearch
+python ../_resources/python/fix_output_files.py --tax taxonomy.vsearch --asv asv.tab-csv
+cp taxonomy.vsearch ../$project.$nowformat/taxonomy.vsearch
+cp asv.tab-csv ../$project.$nowformat/asv_table.merge.txt
+
+#sed -i .bak -e "s/c:.*,o:/o:/g" -e "s/,[A-Za-z0-9_-]*;tax=//" -e "s/	/,/"  -e "s/,.*k:/,k:/" taxonomy.vsearch
 # sed -i .bak -e "s/c:.*,o:/o:/g" -e "s/[A-Za-z0-9]*;tax=//" -e "s/	/,/" taxonomy.blast
 
-if [ "$classificationOnly" = "16S" ]
-  then
-    sed -e "s/,.*d:/,d:/"  -e "s/p:Actinobacteria/p:Actinobacteria_phylum/" -e "s/_\d,/,/" taxonomy.vsearch  >  ../$project.$nowformat/taxonomy.vsearch
-  else
-    sed -e "s/,.*d:/,d:/" taxonomy.vsearch  >  ../$project.$nowformat/taxonomy.vsearch
-fi
+# if [ "$classificationOnly" = "16S" ]
+#   then
+#     sed -e "s/,.*d:/,d:/"  -e "s/p:Actinobacteria/p:Actinobacteria_phylum/" -e "s/_\d,/,/" taxonomy.vsearch  >  ../$project.$nowformat/taxonomy.vsearch
+#   else
+#     sed -e "s/,.*d:/,d:/" taxonomy.vsearch  >  ../$project.$nowformat/taxonomy.vsearch
+# fi
 
 #sed -i .bak "s/OTUId//" ../$project.$nowformat/asv_table.merge.txt
 
 # without python scripts
-sed -i .bak "s/^\#OTU ID//" ../$project.$nowformat/asv_table.merge.txt
-sed -i .bak "s/;size=[0-9]*//" ../$project.$nowformat/taxonomy.vsearch
+# sed -i .bak "s/^\#OTU ID//" ../$project.$nowformat/asv_table.merge.txt
+# sed -i .bak "s/;size=[0-9]*//" ../$project.$nowformat/taxonomy.vsearch
 
 #cp config.txt  ../$project.$nowformat/
 
