@@ -32,7 +32,7 @@ If you use this script, please kindly cite this article: https://doi.org/10.1098
 
 Then you are ready to run:
 ```sh
-sh _processing_MB_0.2a.sh <FOLDER>
+bash _processing_MB_0.2a.sh <FOLDER>
 ```
 
 Results will be in a new subfolder of your current directory called ```<FOLDER>.<DATE>```
@@ -40,7 +40,7 @@ Results will be in a new subfolder of your current directory called ```<FOLDER>.
 In case the analysis needs to be reverted, which will remove files and bring the folder structure back to the original state.
 
 ```sh
-sh _revert_analysis_1.sh <FOLDER>
+bash _revert_analysis_1.sh <FOLDER>
 ```
 
 # Import into R
