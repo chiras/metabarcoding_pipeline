@@ -30,6 +30,7 @@ data.comp.filter <- remove_unresolved_taxa(data.comp)
 
 ## Make taxa labels nice for plots
 data.comp.filter <- replace_tax_prefixes(data.comp.filter)
+taxa_names(data.comp.filter) <- interaction(taxa_names(data.comp.filter),tax_table(data.comp.filter)[,length(colnames(tax_table(data.comp.filter)))])
 
 ### Check the names
 tail(tax_table(data.comp.filter))
