@@ -7,6 +7,10 @@ A simple script to process metabarcoding (e.g. 16S V4) data, with amplicons gene
 
 If you use this script, please kindly cite this article: https://doi.org/10.1098/rstb.2021.0171
 
+# Dependencies
+* VSEARCH https://github.com/torognes/vsearch
+* SeqFilter https://github.com/BioInf-Wuerzburg/SeqFilter
+
 # What will the script do?
 
 * Un-gzipping files
