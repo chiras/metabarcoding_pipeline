@@ -10,6 +10,8 @@ If you use this script, please kindly cite this article: https://doi.org/10.1098
 # Dependencies
 * VSEARCH https://github.com/torognes/vsearch
 * SeqFilter https://github.com/BioInf-Wuerzburg/SeqFilter
+* (USEARCH python scripts depreciated and work around is now integrated https://drive5.com/python/ )
+* Also check the _DBs folder for Databases
 
 # What will the script do?
 
