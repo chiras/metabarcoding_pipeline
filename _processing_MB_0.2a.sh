@@ -14,9 +14,14 @@ if [ -z "$1" ]; then
   exit 1
 fi
 
-project=$1
+project=$(echo "$1" | sed 's:/*$::' | sed 's/^.*\///')
+path=$1
+
 now=$(date)
 nowformat=$(date +"%y-%m-%d")
+
+echo "project: $project"
+echo "project path: $path"
 
 echo "-- create output folder $project.$nowformat; add first files"
 mkdir -p $project.$nowformat
@@ -54,8 +59,22 @@ if [ $skip_preprocessing -ne 1 ]
     echo "Processing sample $s"
     echo "(F: $f R: $r)"
     echo "===================================="
-    $vsearch --fastq_mergepairs  $f \
-          --reverse $r \
+    
+    # stripping last bases of forward & reverse, which can be bad quality
+    $vsearch --fastq_filter $f \
+          --fastq_trunclen_keep $cutend_fw \
+          --fastqout $f.sl.fq \
+          --threads $threads 2> logs/vsearch.rtf.$s.log
+
+    $vsearch --fastq_filter $r \
+          --fastq_trunclen_keep $cutend_rv \
+          --fastqout $r.sl.fq \
+          --threads $threads 2> logs/vsearch.rtf.$s.log
+
+    # merging reads
+    $vsearch --fastq_mergepairs $f.sl.fq \
+          --reverse $r.sl.fq \
+          $mergeoptions \
           --fastq_minovlen $merge_minovlen \
           --fastq_maxdiffs $merge_maxdiffs \
           --fastqout $s.merge.fq \
@@ -66,6 +85,7 @@ if [ $skip_preprocessing -ne 1 ]
     var="$(grep "Merged" logs/vsearch.m.$s.log)"
     echo "$s : $var" | tee -a logs/_merging.log
 
+    #quality filtering
     $vsearch --fastq_filter $s.merge.fq \
       --fastq_stripleft $stripleft \
       --fastq_stripright $stripright \
@@ -259,65 +279,11 @@ cut -f1,4 zotus.uc.merge.nohit.sintax | sed -E -e "s/\_[0-9]+//g" -e "s/,s:.*$//
 
 # v3 idea [TODO]: phylo + spc estimation on sintax results
 
-#cut -f4 zotus.uc.merge.nohit.sintax | head |
-#cut -f1,4 zotus.uc.merge.nohit.sintax | head | sed "s/^\(.*\)[[:space:]]\(.*\)$/\2/"
-
-#mkdir -p unresolved
-
-#cut -f4 zotus.uc.merge.nohit.sintax | head  | sort | uniq | sed "s/^.*,//" | sort > unresolved/tmp.taxa
-
-#grep "k:Viridiplantae,p:Streptophyta,c:Magnoliopsida,o:Rosales,f:Moraceae,g:Sorocea" taxonomy.vsearch
-
-## get those with unresolved phylos
-
-
-
-# #BLAST local DBs
-# countdb=0
-# cp  zotus.merge.fa zotus.blast.$countdb.uc.nohit.fasta
-# prevDB=$countdb
-# touch zotus.blast.hits
-# touch taxonomy.blast
-#
-# for db in "${refDBs[@]}"
-#   do :
-#     countdb=$((countdb+1))
-#     echo "\n\n#### Direct BLAST Classification level: $countdb";
-#     echo "DB: $db";
-#     #makeblastdb -in $db -parse_seqids -blastdb_version 5 -dbtype nucl
-#     blastn  -outfmt '6 qseqid sseqid length pident qcovs' -max_target_seqs 1  -query  zotus.blast.$prevDB.uc.nohit.fasta -subject $db -perc_identity $threshold -qcov_hsp_perc 90 -num_threads $threads > zotus.blast.$countdb.out
-#     cut -f1 -d"	" zotus.blast.$countdb.out | cut -f1 >> zotus.blast.hits
-#     $sf zotus.merge.fa --ids-exclude --ids  zotus.blast.hits --out zotus.blast.$countdb.uc.nohit.fasta
-#     prevDB=$countdb
-#     cut -f 1,2 zotus.blast.$countdb.out >> taxonomy.blast
-#
-#   done
-
-#BLAST web nt instead of sintax here?
-
 echo "-- polishing and copying output files"
 
-python ../_resources/python/fix_output_files.py --tax taxonomy.vsearch --asv asv.tab-csv
+python3 ../_resources/python/fix_output_files.py --tax taxonomy.vsearch --asv asv.tab-csv
 cp taxonomy.vsearch ../$project.$nowformat/taxonomy.vsearch
 cp asv.tab-csv ../$project.$nowformat/asv_table.merge.txt
-
-#sed -i .bak -e "s/c:.*,o:/o:/g" -e "s/,[A-Za-z0-9_-]*;tax=//" -e "s/	/,/"  -e "s/,.*k:/,k:/" taxonomy.vsearch
-# sed -i .bak -e "s/c:.*,o:/o:/g" -e "s/[A-Za-z0-9]*;tax=//" -e "s/	/,/" taxonomy.blast
-
-# if [ "$classificationOnly" = "16S" ]
-#   then
-#     sed -e "s/,.*d:/,d:/"  -e "s/p:Actinobacteria/p:Actinobacteria_phylum/" -e "s/_\d,/,/" taxonomy.vsearch  >  ../$project.$nowformat/taxonomy.vsearch
-#   else
-#     sed -e "s/,.*d:/,d:/" taxonomy.vsearch  >  ../$project.$nowformat/taxonomy.vsearch
-# fi
-
-#sed -i .bak "s/OTUId//" ../$project.$nowformat/asv_table.merge.txt
-
-# without python scripts
-# sed -i .bak "s/^\#OTU ID//" ../$project.$nowformat/asv_table.merge.txt
-# sed -i .bak "s/;size=[0-9]*//" ../$project.$nowformat/taxonomy.vsearch
-
-#cp config.txt  ../$project.$nowformat/
 
 echo "-- create R script"
 

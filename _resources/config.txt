@@ -32,13 +32,16 @@ fastq_truncee=1.5
 stripleft=0            # in case of adapters
 stripright=0         # in case of adapters
 unoisealpha=2         # default 2
+cutend_fw=200       # number of bases to keep
+cutend_rv=175      # number of bases to keep
+
+
 
 # classification
 tax_threshold=97 # perc identity threshold for classification
 sintax_cutoff=0.9
 
 # Paths to binaries
-seqfilter=~/Documents/Arbeit/Projects/Metabarcoding/Bins/SeqFilter/bin/SeqFilter
-pythonscripts=~/Documents/Arbeit/Projects/Metabarcoding/Bins/uchime/python_scripts
-vsearch=~/Documents/Arbeit/Projects/Metabarcoding/Bins/vsearch
+seqfilter=PATH/TO/BINARY/OF/SeqFilter
+vsearch=PATH/TO/BINARY/OF/vsearch
   
