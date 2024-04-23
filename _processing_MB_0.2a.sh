@@ -180,12 +180,6 @@ fi #end skippp
 
   grep "Matching" logs/_mapping.log
 
-  #python2.7 $p/uc2otutab.py map.trunc.uc > zotu_table.trunc.txt
-
-  # not necessary anymore
-  #echo "-- convert to table"
-  #python2.7 $pythonscripts/uc2otutab.py map.merge.uc > asv_table.merge.txt
-
   echo "-- create output folder $project.$nowformat; add first files"
 
   # copy final files into folde
