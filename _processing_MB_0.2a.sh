@@ -9,6 +9,8 @@
 # https://doi.org/10.1098/rstb.2021.0171
 ###################################################################
 
+githash=$(git log -1 --pretty=format:%h)
+
 if [ -z "$1" ]; then
   echo 'No directory supplied' >&2
   exit 1
@@ -20,11 +22,19 @@ path=$1
 now=$(date)
 nowformat=$(date +"%y-%m-%d")
 
+mkdir -p $project.$nowformat
+
+# start logging
+(
+echo "------------------------------------------------------------------"
+echo "script: https://github.com/chiras/metabarcoding_pipeline"
+echo "version: $githash"
+echo "------------------------------------------------------------------"
 echo "project: $project"
 echo "project path: $path"
-
-echo "-- create output folder $project.$nowformat; add first files"
-mkdir -p $project.$nowformat
+echo "results output path: $project.$nowformat"
+echo "script log file path: $project.$nowformat/script_$nowformat.log"
+echo "------------------------------------------------------------------"
 
 echo "-- moving in data dir"
 cd $project
@@ -309,4 +319,9 @@ if [ $compressionCleanup -eq 1 ]
   then
     echo "-- compressing large files"
     sh _compression_cleanup_1.sh $project
+  else 
+    echo "NO compression and cleanup applied. Consider calling:"
+    echo " bash _compression_cleanup_1.sh $project"
 fi
+
+) | tee $project.$nowformat/script_$nowformat.log
