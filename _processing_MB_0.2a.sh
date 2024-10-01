@@ -10,6 +10,7 @@
 ###################################################################
 
 githash=$(git log -1 --pretty=format:%h)
+gitversion=$(git log --pretty=format:%h | wc -l)
 
 if [ -z "$1" ]; then
   echo 'No directory supplied' >&2
@@ -28,7 +29,7 @@ mkdir -p $project.$nowformat
 (
 echo "------------------------------------------------------------------"
 echo "script: https://github.com/chiras/metabarcoding_pipeline"
-echo "version: $githash"
+echo "version: $githash, revision $gitversion" 
 echo "------------------------------------------------------------------"
 echo "project: $project"
 echo "project path: $path"
