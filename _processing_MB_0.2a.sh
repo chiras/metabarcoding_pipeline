@@ -311,6 +311,15 @@ cat ../_resources/R_template_ITS2.R >> ../$project.$nowformat/R_$project.v0.R
 cp ../_resources/metabarcoding_tools_0-1a.R ../$project.$nowformat/
 mkdir -p ../$project.$nowformat/plots
 
+if [ $phylogeny -eq 1 ]
+  then
+    $mafft zotus.merge.fa > zotus.merge.mafft.fa
+    sed "s/;/_/g" zotus.merge.mafft.fa > zotus.merge.mafft2.fa
+    $raxml --msa zotus.merge.mafft2.fa --model GTR+G --msa-format FASTA -threads $threads --prefix zotus
+    sed "s/_/;/g" zotus.merge.mafft.fa > ../$project.$nowformat/asvs.tre
+
+fi
+
 $vsearch -v > logs/software.version
 cd ..
 

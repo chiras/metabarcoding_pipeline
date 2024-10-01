@@ -20,6 +20,7 @@ classificationOnly=0    # only reclassification, necessary files need to be pres
 compressionCleanup=0   # compress large files at the end, as well as log, raw and tmp folders
 blastalternateclass=0   # have blast done with the same databases as an alternative classification method.
                         # Beware, particularly the final webblast can take a long time and requires a stable internet connection
+phylogeny=0             # whether to do a phylogenetic tree of ASV for e.g. UniFrac
 
 # Processing parameters (default ITS2)
 merge_minovlen=20
@@ -44,4 +45,5 @@ sintax_cutoff=0.9
 # Paths to binaries
 seqfilter=PATH/TO/BINARY/OF/SeqFilter
 vsearch=PATH/TO/BINARY/OF/vsearch
-  
+muscle="PATH/TO/BINARY/OF/mafft"    # only if phylogeny=1
+raxml="PATH/TO/BINARY/OF/raxml-ng"  # only if phylogeny=1  
