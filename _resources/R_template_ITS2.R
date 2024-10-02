@@ -5,16 +5,22 @@ data.tax <- tax_table(as.matrix(read.table("taxonomy.vsearch", header=T,row.name
 ## Community table
 data.otu <- otu_table(read.table("asv_table.merge.txt"), taxa_are_rows=T)
 
+## if phylogeny included
+# data.tre <- read.tree("asvs.tre")
+
 ## Sample metadata (second line optional if sample names include "-"):
 data.map <- 	sample_data(read.table("samples.csv", header=T, row.names=2,  sep=";", fill=T))
 sample_names(data.map) <- gsub("-",".",sample_names(data.map))
 
 ## check metadata vs. samples in sequencing data consistency
-sample_names(data.map )[!(sample_names(data.map ) %in% sample_names(data.otu))]
-sample_names(data.otu )[!(sample_names(data.otu ) %in% sample_names(data.map))]
+sample_names(data.map)[!(sample_names(data.map) %in% sample_names(data.otu))]
+sample_names(data.otu)[!(sample_names(data.otu) %in% sample_names(data.map))]
 
-## merge the three tables to a single phylseq object
-(data.comp <- merge_phyloseq(data.otu,data.tax,data.map ))
+## merge the three tables to a single phyloseq object
+(data.comp <- merge_phyloseq(data.otu,data.tax,data.map))
+## if phylogeny included: 
+# (data.comp <- merge_phyloseq(data.otu,data.tax,data.map,data.tre))
+
 
 # create fake metadata if needed
 data.comp <- fill_pseudo_metadata(data.comp)
@@ -162,6 +168,13 @@ plot_ordination(data.species.rel.filter, data.species.filter.nmds , color="treat
   #geom_label(label=sample_names(data.species.rel.filter))
 dev.off()
 
+## if phylogeny included:
+# pdf("plots/sample_ordination_PCOA_unifrac_uw.pdf", width=12, height=10)
+
+# unifrac.dist <- UniFrac(data.species.rel.filter)
+# ordi = ordinate(data.species.rel.filter, "PCoA", "unifrac", weighted=F)
+# plot_ordination(data.species.rel.filter, ordi, color="Plot")
+# dev.off()
 
 ## Networks (replace id by group if you want to have them merged by metadata)
 netmat <- t(otu_table(data.species.rel.filter))

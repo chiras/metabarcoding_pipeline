@@ -315,10 +315,11 @@ mkdir -p ../$project.$nowformat/plots
 if [ $phylogeny -eq 1 ]
   then
     $mafft zotus.merge.fa > zotus.merge.mafft.fa
-    sed "s/;/_/g" zotus.merge.mafft.fa > zotus.merge.mafft2.fa
+    sed "s/;size/_size/g" zotus.merge.mafft.fa > zotus.merge.mafft2.fa
     $raxml --msa zotus.merge.mafft2.fa --model GTR+G --msa-format FASTA -threads $threads --prefix zotus
-    sed "s/_/;/g" zotus.merge.mafft.fa > ../$project.$nowformat/asvs.tre
-
+    sed "s/;size/_size/g" ./taxonomy.vsearch > ../$project.$nowformat/taxonomy.vsearch
+    sed "s/;size/_size/g" asv.tab-csv > ../$project.$nowformat/asv_table.merge.txt
+    cp ./zotus.merge.mafft2.fa.raxml.bestTree ../$project.$nowformat/asvs.tre
 fi
 
 $vsearch -v > logs/software.version
