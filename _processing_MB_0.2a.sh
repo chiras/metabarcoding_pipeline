@@ -187,7 +187,7 @@ fi #end skippp
 
   ### create community table
   echo "-- add barcodelabel"
-  cat all.merge.noprimer.fasta |  sed "s/^>R1+2-\(.*\)\_\([0-9]*\);/>R1+2-\1_\2;barcodelabel=\1;/g" |  sed "s/^>R1-\([a-zA-Z0-9-]*\)\_\([0-9]*\)/>R1-\1_\2;barcodelabel=\1;/g" > all.merge.bc.fasta
+  cat all.merge.fasta.noprimer.fa |  sed "s/^>R1+2-\(.*\)\_\([0-9]*\);/>R1+2-\1_\2;barcodelabel=\1;/g" |  sed "s/^>R1-\([a-zA-Z0-9-]*\)\_\([0-9]*\)/>R1-\1_\2;barcodelabel=\1;/g" > all.merge.bc.fasta
 
   echo "-- map data against ASVs"
   $vsearch --usearch_global all.merge.bc.fasta --db zotus.merge.fa --strand plus --id 0.97 --uc map.merge.uc --otutabout asv.tab-csv --sizeout --threads $threads 2> logs/_mapping.log
