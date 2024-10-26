@@ -45,5 +45,5 @@ sintax_cutoff=0.9
 # Paths to binaries
 seqfilter=PATH/TO/BINARY/OF/SeqFilter
 vsearch=PATH/TO/BINARY/OF/vsearch
-muscle="PATH/TO/BINARY/OF/mafft"    # only if phylogeny=1
+mafft="PATH/TO/BINARY/OF/mafft"    # only if phylogeny=1
 raxml="PATH/TO/BINARY/OF/raxml-ng"  # only if phylogeny=1  
