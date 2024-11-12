@@ -203,7 +203,6 @@ done
 
 fi #end skippp
 
-
   echo " "
   echo "===================================="
   echo "ASV generation and mapping"
@@ -246,7 +245,11 @@ fi #end skippp
   if [[ $postcluster -gt 0 ]]; then
     mv zotus.merge.fa zotus.merge.tmp.fa
     echo "-- postclustering of ASVs at $postcluster% identity"
-    $vsearch --cluster_fast zotus.merge.tmp.fa --centroids zotus.merge.fa --minsize 1 --sizein --sizeout --sizeorder --id 0.$postcluster
+    $vsearch --cluster_fast zotus.merge.tmp.fa \
+              --centroids zotus.merge.fa  \
+              --sizein --sizeout --sizeorder \
+              --threads $threads \
+              --id 0.$postcluster 2>  logs/_postcluster.log
     clusterin=$(grep -c ">" zotus.merge.tmp.fa)
     clusterout=$(grep -c ">" zotus.merge.fa)
     echo "$clusterin ASVs post-clustered to $clusterout pASVs"
@@ -325,7 +328,7 @@ prevDB=$countdb
 for db in "${refDBs[@]}"
   do :
     countdb=$((countdb+1))
-    echo "\n\n#### Direct vsearch Classification level: $countdb";
+    echo "-- Direct vsearch Classification level: $countdb";
     echo "DB: $db";
     $vsearch --usearch_global zotus.direct.$prevDB.uc.nohit.fasta \
       --db $db \
@@ -336,12 +339,27 @@ for db in "${refDBs[@]}"
       --threads $threads 2>  logs/_direct.$countdb.log
 
     grep "^N[[:space:]]" zotus.direct.$countdb.uc | cut -f 9 > zotus.direct.$countdb.uc.nohit
-    $seqfilter zotus.merge.fa --ids zotus.direct.$countdb.uc.nohit --out zotus.direct.$countdb.uc.nohit.fasta
+    total_xhits=$(wc -l zotus.direct.$countdb.uc | grep -o '[0-9]*' | head -n 1)
+    counted_hits=$(grep -c -v "^N[[:space:]]" zotus.direct.$countdb.uc )
+    counted_nohits=$(grep -c  "^N[[:space:]]" zotus.direct.$countdb.uc )
+    listed_nohits=$(wc -l zotus.direct.$countdb.uc.nohit | grep -o '[0-9]*' | head -n 1)
+
+    echo "Total:                      $total_xhits, thereof $counted_hits hits and $counted_nohits no hits"
+    echo "Listed for next iteration:  $listed_nohits"
+
+    python ../_resources/python/subset_fasta.py -i zotus.merge.fa \
+      -l zotus.direct.$countdb.uc.nohit \
+      -o zotus.direct.$countdb.uc.nohit.fasta
+    
+    #$seqfilter zotus.merge.fa --ids zotus.direct.$countdb.uc.nohit --out zotus.direct.$countdb.uc.nohit.fasta
+    filtered_nohits=$(grep -c  ">" zotus.direct.$countdb.uc.nohit.fasta)
+    echo "Filtered:                   $filtered_nohits"
+
     cut -f 9,10 zotus.direct.$countdb.uc  | grep -v "*" | sed "s/[A-Za-z0-9_-]*;tax=//" >> taxonomy.vsearch
     prevDB=$countdb
   done
 
-echo "\n\n#### Hierarchical vsearch classification";
+echo "-- Hierarchical vsearch classification";
 echo "DB: $hieDBs";
 
 $vsearch --sintax zotus.direct.$countdb.uc.nohit.fasta \
@@ -350,6 +368,8 @@ $vsearch --sintax zotus.direct.$countdb.uc.nohit.fasta \
   --strand plus \
   --sintax_cutoff $sintax_cutoff \
   --threads $threads 2>  logs/_sintax.log
+
+python ../_resources/python/sintax_overview.py zotus.uc.merge.nohit.sintax
 
 cut -f1,4 zotus.uc.merge.nohit.sintax | sed -E -e "s/\_[0-9]+//g" -e "s/,s:.*$//"  >> taxonomy.vsearch
 
