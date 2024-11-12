@@ -68,7 +68,7 @@ for f in *_R1_*.fastq; do
     # Initialize variables for this sample
     r=$(sed -e "s/_R1_/_R2_/" <<< "$f")
     s=$(echo $f | sed "s/_L001.*//g")
-    total=$(grep "^@M" $f | wc -l)
+    total=$(grep "^@" $f | wc -l)
 
     echo "===================================="
     echo "Processing sample $s"
@@ -198,9 +198,10 @@ done
     mv *.fq tmp/
     mv *.fa tmp/
 
-fi #end skippp
   echo "-- removing primer sequences"
   python ../_resources/python/remove_primers_2.py --input all.merge.fasta --output  all.merge.fasta.noprimer.fa --marker $marker
+
+fi #end skippp
 
 
   echo " "
@@ -241,6 +242,15 @@ fi #end skippp
     --threads $threads 2>  logs/_uchime.log
 
   grep "Found" logs/_uchime.log
+
+  if [[ $postcluster -gt 0 ]]; then
+    mv zotus.merge.fa zotus.merge.tmp.fa
+    echo "-- postclustering of ASVs at $postcluster% identity"
+    $vsearch --cluster_fast zotus.merge.tmp.fa --centroids zotus.merge.fa --minsize 1 --sizein --sizeout --sizeorder --id 0.$postcluster
+    clusterin=$(grep -c ">" zotus.merge.tmp.fa)
+    clusterout=$(grep -c ">" zotus.merge.fa)
+    echo "$clusterin ASVs post-clustered to $clusterout pASVs"
+  fi
 
   ### create community table
   echo "-- add barcodelabel"

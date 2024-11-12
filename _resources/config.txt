@@ -36,7 +36,7 @@ unoisealpha=2         # default 2
 cutend_fw=200       # number of bases to keep
 cutend_rv=175      # number of bases to keep
 mergeoptions=""    # if you need to pass other parameters to merge
-
+postcluster=97 # leave 0 for no postclustering of ASVs, otherwise percent identity in integer
 
 # classification
 tax_threshold=97 # perc identity threshold for classification
