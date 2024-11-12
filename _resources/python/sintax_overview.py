@@ -18,7 +18,7 @@ def count_classifiable_levels(filename):
             unique_levels.update(found_levels)
 
     # Sort the levels in a standard taxonomic order, if possible
-    ordered_levels = sorted(unique_levels, key=lambda x: "dkgpcofgs".index(x) if x in "dkgpcofgs" else len("dkgpcofgs"))
+    ordered_levels = sorted(unique_levels, key=lambda x: "dkpcofgs".index(x) if x in "dkpcofgs" else len("dkpcofgs"))
 
     # Second pass to count sequences classifiable to each level
     with open(filename, 'r') as file:
