@@ -14,9 +14,9 @@ def count_classifiable_levels(filename):
                 continue
 
             classifications = fields[-1]  # Taking the last column as the classification part
-            found_levels = re.findall(r'([a-z]):[A-Za-z_]+\(.*?\)', classifications)
+            found_levels = re.findall(r'([a-z]):', classifications)
             unique_levels.update(found_levels)
-    
+
     # Sort the levels in a standard taxonomic order, if possible
     ordered_levels = sorted(unique_levels, key=lambda x: "dkgpcofgs".index(x) if x in "dkgpcofgs" else len("dkgpcofgs"))
 
@@ -28,7 +28,7 @@ def count_classifiable_levels(filename):
                 continue
 
             classifications = fields[-1]  # Taking the last column as the classification part
-            found_levels = re.findall(r'([a-z]):[A-Za-z_]+\(.*?\)', classifications)
+            found_levels = re.findall(r'([a-z]):', classifications)
             for level in ordered_levels:
                 if level in found_levels:
                     counts[level] += 1
