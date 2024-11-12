@@ -57,32 +57,39 @@ if [ $skip_preprocessing -ne 1 ]
   #extracting files
   find . -name '*.gz' -print0 | xargs -0 -I {} -P $threads gunzip {}
 
-  # looping through all files for merging
-  echo "-- starting merging and filter "
-  for f in *_R1_*.fastq; do
 
+# Define the header of the log file
+echo "Sample ID,Total Reads,Merged Reads,Filtered Reads,Truncated Reads, Selected Strategy,Selected File,Selected Reads" > logs/_consolidated_log.csv
+
+# Loop through all files for merging
+echo "-- Starting merging and filtering --"
+for f in *_R1_*.fastq; do
+
+    # Initialize variables for this sample
     r=$(sed -e "s/_R1_/_R2_/" <<< "$f")
     s=$(echo $f | sed "s/_L001.*//g")
-  	total=$(grep "^@M" $f | wc -l)
+    total=$(grep "^@M" $f | wc -l)
 
-    echo " "
     echo "===================================="
     echo "Processing sample $s"
     echo "(F: $f R: $r)"
     echo "===================================="
-    
-    # stripping last bases of forward & reverse, which can be bad quality
+
+   
+    # Stripping last bases for quality
     $vsearch --fastq_filter $f \
           --fastq_trunclen_keep $cutend_fw \
+          --fastq_truncee 3 \
           --fastqout $f.sl.fq \
           --threads $threads 2> logs/vsearch.rtf.$s.log
 
     $vsearch --fastq_filter $r \
           --fastq_trunclen_keep $cutend_rv \
+          --fastq_truncee 3 \
           --fastqout $r.sl.fq \
           --threads $threads 2> logs/vsearch.rtf.$s.log
 
-    # merging reads
+    # Merging reads
     $vsearch --fastq_mergepairs $f.sl.fq \
           --reverse $r.sl.fq \
           $mergeoptions \
@@ -93,10 +100,11 @@ if [ $skip_preprocessing -ne 1 ]
           --relabel R1+2-${s}_ \
           --threads $threads  2> logs/vsearch.m.$s.log
 
-    var="$(grep "Merged" logs/vsearch.m.$s.log)"
-    echo "$s : $var" | tee -a logs/_merging.log
+    merged_reads=$(grep "Merged" logs/vsearch.m.$s.log )
+    echo "$s : $merged_reads" | tee -a logs/_merging.log
+    merged_reads=$(echo $merged_reads | grep -o '[0-9]*' | head -n 1)
 
-    #quality filtering
+    # Quality filtering on merged reads
     $vsearch --fastq_filter $s.merge.fq \
       --fastq_stripleft $stripleft \
       --fastq_stripright $stripright \
@@ -108,9 +116,11 @@ if [ $skip_preprocessing -ne 1 ]
       --fasta_width 0 \
       --threads $threads 2> logs/vsearch.mf.$s.log
 
-    var="$(grep "sequences kept" logs/vsearch.mf.$s.log)"
-    echo "$s : $var" | tee -a logs/_filter.log
+    filtered_reads=$(grep "sequences kept" logs/vsearch.mf.$s.log )
+    echo "$s : $filtered_reads" | tee -a logs/_filter.log
+    filtered_reads=$(echo $filtered_reads | grep -o '[0-9]*' | head -n 1)
 
+    # Truncation filtering
     $vsearch --fastq_truncee $fastq_truncee \
           --fastq_filter $f \
           --fastq_minlen $fastq_minlen \
@@ -118,13 +128,56 @@ if [ $skip_preprocessing -ne 1 ]
           --relabel R1-${s}_ \
           --threads $threads 2> logs/vsearch.tf.$s.log
 
-    var="$(grep "sequences kept" logs/vsearch.tf.$s.log)"
-    echo "$s : $var" | tee -a logs/_truncfilter.log
+    trunc_reads=$(grep "sequences kept" logs/vsearch.tf.$s.log )
+    echo "$s : $trunc_reads" | tee -a logs/_truncfilter.log
+    trunc_reads=$(echo $trunc_reads | grep -o '[0-9]*' | head -n 1)
 
-  done
+    # Apply conditions for selecting the best file
+    selected_file=""
+    if [[ $filtered_reads -gt 10000 ]]; then
+        selected_file="$s.mergefiltered.fa"
+        selected_reads=$filtered_reads
+        not_selected_reads=$trunc_reads
+        strategy="MERGE & Filter"
+    elif [[ $filtered_reads -gt 5000 && $trunc_reads -gt 10000 ]]; then
+        selected_file="$s.trunc.fa"
+        selected_reads=$trunc_reads
+        not_selected_reads=$filtered_reads
+        strategy="TRUNC & Filter"
+    elif [[ $filtered_reads -gt 5000 && $trunc_reads -lt 10000 ]]; then
+        selected_file="$s.mergefiltered.fa"
+        selected_reads=$filtered_reads
+        not_selected_reads=$trunc_reads
+        strategy="MERGE & Filter"
+    elif [[ $filtered_reads -lt 5000 && $trunc_reads -gt 5000 ]]; then
+        selected_file="$s.trunc.fa"
+        selected_reads=$trunc_reads
+        not_selected_reads=$filtered_reads
+        strategy="TRUNC & Filter"
+    else
+        if [[ $trunc_reads -lt $(( 3 * filtered_reads / 2 )) ]]; then
+            selected_file="$s.mergefiltered.fa"
+            selected_reads=$filtered_reads
+            not_selected_reads=$trunc_reads
+            strategy="MERGE & Filter (Low)"
+        else
+            selected_file="$s.trunc.fa"
+            selected_reads=$trunc_reads
+            not_selected_reads=$filtered_reads
+            strategy="TRUNC & Filter (Low)"
+        fi
+    fi
 
-  cat *mergefiltered.fa > all.merge.fasta
-  cat *trunc.fa > all.trunc.fasta
+    # Output the selected file and copy it as final selection
+    cp "$selected_file" "$s.selection.fa"
+
+    # Log results to consolidated CSV file
+    echo "$s,$total,$merged_reads,$filtered_reads,$trunc_reads,$strategy,$selected_file,$selected_reads" >> logs/_consolidated_log.csv
+
+    # Display selection summary
+    echo "Selected $strategy: $selected_file ($selected_reads reads)"
+    echo ""
+done
 
   if [ $use_fw_only -eq 1 ]
     then
