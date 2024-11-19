@@ -11,5 +11,5 @@ with open(args.input, "r") as infile, open(args.output, "w") as outfile:
         if line.startswith(">R1+2-"):
             line = re.sub(r"^>R1\+2-(.*)_(\d+);", r">R1+2-\1_\2;barcodelabel=\1;", line)
         elif line.startswith(">R1-"):
-            line = re.sub(r"^>R1-(\w+)_(\d+);", r">R1-\1_\2;barcodelabel=\1;", line)
+            line = re.sub(r"^>R1-(.*)_(\d+)$", r">R1-\1_\2;barcodelabel=\1", line)
         outfile.write(line)
