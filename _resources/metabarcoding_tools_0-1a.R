@@ -32,6 +32,7 @@ remove_unresolved_taxa <- function(phyloseq){
     (phyloseq = subset_taxa(phyloseq, kingdom=="d:Bacteria"))
     (phyloseq = subset_taxa(phyloseq, phylum!="p:Cyanobacteria/Chloroplast"))
     (phyloseq = subset_taxa(phyloseq, genus!="d:Bacteria_spc_spc_spc_spc"))
+    (phyloseq = subset_taxa(phyloseq, order!="f:Mitochondria"))
     (phyloseq = subset_taxa(phyloseq, kingdom!=""))
   }
   
