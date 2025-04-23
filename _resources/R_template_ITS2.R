@@ -9,7 +9,7 @@ data.otu <- otu_table(read.table("asv_table.merge.txt"), taxa_are_rows=T)
 # data.tre <- read.tree("asvs.tre")
 
 ## Sample metadata (second line optional if sample names include "-"):
-data.map <- 	sample_data(read.table("samples.csv", header=T, row.names=2,  sep=";", fill=T))
+data.map <- 	sample_data(read.table("samples_metadata.csv", header=T, row.names=1,  sep=";", fill=T))
 sample_names(data.map) <- gsub("-",".",sample_names(data.map))
 
 ## check metadata vs. samples in sequencing data consistency

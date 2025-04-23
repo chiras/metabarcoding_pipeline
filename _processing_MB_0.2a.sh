@@ -59,7 +59,9 @@ if [ $skip_preprocessing -ne 1 ]
 
 
 # Define the header of the log file
-echo "Sample ID,Total Reads,Merged Reads,Filtered Reads,Truncated Reads, Selected Strategy,Selected File,Selected Reads" > logs/_consolidated_log.csv
+echo "sample_name,project,total_reads,merged_reads,filtered_reads,truncated_reads,filter_strategy,filter_file,final_reads,*sample_name,sample_title,*organism,*collection_date,*env_broad_scale,*env_local_scale,*env_medium,*geo_loc_name,*host,*lat_lon,elev,source_material_id,description" > logs/_consolidated_log.csv
+
+#   echo "project;name;host;collectionDate;location;country;bioregion;latitude;longitude;tissue;treatment;sampletype;notes" > ../$project.$nowformat/samples.csv
 
 # Loop through all files for merging
 echo "-- Starting merging and filtering --"
@@ -172,7 +174,7 @@ for f in *_R1_*.fastq; do
     cp "$selected_file" "$s.selection.fa"
 
     # Log results to consolidated CSV file
-    echo "$s,$total,$merged_reads,$filtered_reads,$trunc_reads,$strategy,$selected_file,$selected_reads" >> logs/_consolidated_log.csv
+    echo "$s,$project,$total,$merged_reads,$filtered_reads,$trunc_reads,$strategy,$selected_file,$selected_reads,$sample_name,$sample_name,metagenome,,,,,,,,,," >> logs/_consolidated_log.csv
 
     # Display selection summary
     echo "Selected $strategy: $selected_file ($selected_reads reads)"
@@ -281,7 +283,7 @@ fi #end skippp
   # prepare final sample information file
   echo "project;name;host;collectionDate;location;country;bioregion;latitude;longitude;tissue;treatment;sampletype;notes" > ../$project.$nowformat/samples.csv
   head -n 1 asv.tab-csv | sed -e "s/#OTU ID[[:space:]]//g" | tr "\t" "\n" | sed "s/^/$project;/"  >> ../$project.$nowformat/samples.csv
-
+  cp logs/_consolidated_log.csv ../$project.$nowformat/samples_metadata.csv
 fi #end classificationOnly
 
 ##### create taxonomy
@@ -391,12 +393,12 @@ echo "# Marker: $marker" >>../$project.$nowformat/R_$project.v0.R
 echo "# For: $datasupplier" >>../$project.$nowformat/R_$project.v0.R
 
 cat ../_resources/R_template_libraries.R >> ../$project.$nowformat/R_$project.v0.R
-echo "\n\n# Setting working directory (check path)" >>../$project.$nowformat/R_$project.v0.R
+echo "# Setting working directory (check path)" >>../$project.$nowformat/R_$project.v0.R
 echo "setwd('$(pwd)/../$project.$nowformat')" >>../$project.$nowformat/R_$project.v0.R
 
-echo "\n\n# Custom functions inclusion" >>../$project.$nowformat/R_$project.v0.R
+echo "# Custom functions inclusion" >>../$project.$nowformat/R_$project.v0.R
 echo "marker=\"$marker\"" >>../$project.$nowformat/R_$project.v0.R
-echo "source('$(pwd)/../_resources/metabarcoding_tools_0-1a.R')" >>../$project.$nowformat/R_$project.v0.R
+echo "source('./metabarcoding_tools_0-1a.R')" >>../$project.$nowformat/R_$project.v0.R
 
 cat ../_resources/R_template_ITS2.R >> ../$project.$nowformat/R_$project.v0.R
 
