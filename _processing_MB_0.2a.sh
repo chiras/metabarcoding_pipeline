@@ -123,7 +123,7 @@ for f in *_R1_*.fastq; do
     # Truncation filtering
     $vsearch --fastq_truncee $fastq_truncee \
           --fastq_filter $f \
-          --fastq_minlen $fastq_minlen \
+          --fastq_minlen $fastq_minlen2 \
           --fastaout $s.trunc.fa \
           --relabel R1-${s}_ \
           --threads $threads 2> logs/vsearch.tf.$s.log
@@ -179,6 +179,7 @@ for f in *_R1_*.fastq; do
     echo ""
 done
 
+fi #end skippp
 
   cat *selection.fa > all.merge.fasta
   #cat *trunc.fa > all.trunc.fasta
@@ -201,7 +202,6 @@ done
   echo "-- removing primer sequences"
   python ../_resources/python/remove_primers_2.py --input all.merge.fasta --output  all.merge.fasta.noprimer.fa --marker $marker
 
-fi #end skippp
 
   echo " "
   echo "===================================="
