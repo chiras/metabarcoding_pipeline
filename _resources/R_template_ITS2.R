@@ -45,6 +45,10 @@ tail(tax_table(data.comp.filter))
 (data.species <- tax_glom(data.comp.filter,taxrank="species"))
 taxa_names(data.species) <- tax_table(data.species)[,"species"]
 
+# alternatively try if you used postclustering: 
+# data.species2 <- tax_glom_species_filtered(data.comp.filter,rank="species")
+
+
 ## (optional) Rename samples by type different metadata factors
 #(data.species <- label_sample_by_host(data.species,"host","project"))
 
@@ -73,33 +77,33 @@ ntaxa <- length(taxa_names(data.species.rel.filter))
 
 
 
-# check GBIF location records
-species_records_long <- get_species_occurences_long(data.species.rel.filter, notInGBIF=T)
+# # check GBIF location records
+# species_records_long <- get_species_occurences_long(data.species.rel.filter, notInGBIF=T)
 
-species_records_long$regCountry <- (interaction(species_records_long$region,species_records_long$sub.region))
-species_records_long <- species_records_long[order(species_records_long$region),]
-species_records_long$regCountry <- factor(species_records_long$regCountry, levels = unique(sort(as.character(species_records_long$regCountry))))
+# species_records_long$regCountry <- (interaction(species_records_long$region,species_records_long$sub.region))
+# species_records_long <- species_records_long[order(species_records_long$region),]
+# species_records_long$regCountry <- factor(species_records_long$regCountry, levels = unique(sort(as.character(species_records_long$regCountry))))
 
-species_records_long <- cbind(species_records_long,tax_table(data.species.rel.filter)[species_records_long$Species,])
+# species_records_long <- cbind(species_records_long,tax_table(data.species.rel.filter)[species_records_long$Species,])
 
-species_records_long$SpecAbund <- interaction(species_records_long$Species,sprintf("%.3f", round(species_records_long$Abundance, digits=4)), sep=" | ")
+# species_records_long$SpecAbund <- interaction(species_records_long$Species,sprintf("%.3f", round(species_records_long$Abundance, digits=4)), sep=" | ")
 
-pdf("plots/species_occurence.pdf", width=15, height=ntaxa/5)
+# pdf("plots/species_occurence.pdf", width=15, height=ntaxa/5)
 
-ggplot(species_records_long, aes(fill=regCountry, y=value, x=SpecAbund, alpha=log(Abundance*1000,10))) + 
-  facet_grid(order+family~region, space = "free", scales = "free",switch = "y")+
-  geom_bar(position="stack", stat="identity")+
-  theme(strip.text.y.left = element_text(angle = 0))+
-  theme(axis.text.x = element_text(angle = 60, hjust = 1),axis.title.x = element_text(family = "sans", size = 15)) + 
-  xlab("Species | cumulative relative Abundance")+
-  ylab("GBIF record abundance (log)")+
-  theme(legend.position="bottom")+
-  coord_flip()+ 
-  scale_y_continuous(trans=scales::pseudo_log_trans(base = 10), 
-                     breaks = scales::trans_breaks("log10", function(x) 10^x), 
-                     labels = scales::trans_format("log10", scales::math_format(10^.x))
-  )#+ annotation_logticks(sides = "b", )  
-dev.off()
+# ggplot(species_records_long, aes(fill=regCountry, y=value, x=SpecAbund, alpha=log(Abundance*1000,10))) + 
+#   facet_grid(order+family~region, space = "free", scales = "free",switch = "y")+
+#   geom_bar(position="stack", stat="identity")+
+#   theme(strip.text.y.left = element_text(angle = 0))+
+#   theme(axis.text.x = element_text(angle = 60, hjust = 1),axis.title.x = element_text(family = "sans", size = 15)) + 
+#   xlab("Species | cumulative relative Abundance")+
+#   ylab("GBIF record abundance (log)")+
+#   theme(legend.position="bottom")+
+#   coord_flip()+ 
+#   scale_y_continuous(trans=scales::pseudo_log_trans(base = 10), 
+#                      breaks = scales::trans_breaks("log10", function(x) 10^x), 
+#                      labels = scales::trans_format("log10", scales::math_format(10^.x))
+#   )#+ annotation_logticks(sides = "b", )  
+# dev.off()
 
 
 # Filtering taxa that are not relevant 

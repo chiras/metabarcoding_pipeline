@@ -11,6 +11,45 @@ fill_pseudo_metadata <- function(phyloseq){
   
 }
   
+tax_glom_species_filtered <- function(physeq, rank = "species", sp_pattern = "_sp| spc| sp\\.| spc\\.") {
+  # Extract taxonomy table
+  tax_df <- as.data.frame(tax_table(physeq))
+  
+  # Identify placeholder species
+  is_placeholder <- str_detect(tax_df[[rank]], regex(sp_pattern, ignore_case = TRUE))
+  
+  # Enumerate placeholders by genus
+  tax_df_enumerated <- tax_df
+  if ("genus" %in% colnames(tax_df)) {
+    tax_df_enumerated[is_placeholder, rank] <- tax_df[is_placeholder, ] %>%
+      group_by(genus) %>%
+      mutate(
+        !!rank := paste0(!!sym(rank), " ", row_number())
+      ) %>%
+      pull(!!rank)
+  } else {
+    stop("Taxonomy table must contain a 'genus' column to enumerate.")
+  }
+  
+  # Replace the taxonomy in the phyloseq object
+  tax_table(physeq) <- tax_table(as.matrix(tax_df_enumerated))
+  
+  # Redo identification now that names are unique
+  tax_df <- tax_df_enumerated
+  is_placeholder <- str_detect(tax_df[[rank]], regex(sp_pattern, ignore_case = TRUE))
+  
+  # Split physeq
+  physeq_agglom <- prune_taxa(!is_placeholder, physeq)
+  physeq_leave <- prune_taxa(is_placeholder, physeq)
+  
+  # Agglomerate only non-placeholder species
+  physeq_agglommed <- tax_glom(physeq_agglom, taxrank = rank)
+  
+  # Merge both
+  merged <- merge_phyloseq(physeq_agglommed, physeq_leave)
+  
+  return(merged)
+}
 
 ### define taxa filtering
 remove_unresolved_taxa <- function(phyloseq){

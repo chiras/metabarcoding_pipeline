@@ -25,7 +25,8 @@ phylogeny=0             # whether to do a phylogenetic tree of ASV for e.g. UniF
 # Processing parameters (default ITS2)
 merge_minovlen=20
 merge_maxdiffs=10
-fastq_minlen=100
+fastq_minlen=100            # for merging & filtering
+fastq_minlen2=200                 # for truncation & filtering
 fastq_maxlen=400
 fastq_maxns=0
 fastq_maxee=1
