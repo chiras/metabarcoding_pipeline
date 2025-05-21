@@ -439,4 +439,4 @@ if [ $compressionCleanup -eq 1 ]
     echo " bash _compression_cleanup_1.sh $project"
 fi
 
-) | tee $project.$nowformat/script_$nowformat.log
+) | tee -a $project.$nowformat/script_$nowformat.log
