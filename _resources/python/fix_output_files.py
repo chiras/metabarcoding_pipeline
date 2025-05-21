@@ -12,7 +12,7 @@ patterns_taxonomy = {
     'pattern1.5': (r'\t', ','),
     'pattern2': (r';size=[0-9]*', ''),
     'pattern3': (r',.*d:', ',d:'),
-    'pattern4': (r'c:.*,o:', 'o:'),
+   # 'pattern4': (r'c:.*,o:', 'o:'),
     'pattern5': (r'_[0-9]*,', ','),
     'pattern6': (r',.*k:', ',k:'),
     'pattern7': (r';$', '')

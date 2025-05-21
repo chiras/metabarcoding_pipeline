@@ -390,6 +390,8 @@ cut -f1,4 asvs.uc.merge.nohit.sintax | sed -E -e "s/\_[0-9]+//g" -e "s/,s:.*$//"
 
 echo "-- polishing and copying output files"
 
+cp taxonomy.vsearch cp taxonomy.vsearch.bak
+
 python3 ../_resources/python/fix_output_files.py --tax taxonomy.vsearch --asv asv.tab-csv
 cp taxonomy.vsearch ../$project.$nowformat/taxonomy.vsearch
 cp asv.tab-csv ../$project.$nowformat/asv_table.merge.txt
