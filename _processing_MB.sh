@@ -384,7 +384,40 @@ $vsearch --sintax asvs.direct.$countdb.uc.nohit.fasta \
 
 python ../_resources/python/sintax_overview.py asvs.uc.merge.nohit.sintax
 
-cut -f1,4 asvs.uc.merge.nohit.sintax | sed -E -e "s/\_[0-9]+//g" -e "s/,s:.*$//"  >> taxonomy.vsearch
+
+if [ "$use_blast_sintax_combination" -eq 1 ]; then
+echo "-- LCA BLAST classification";
+
+    # Run combined taxonomy merge script (your python script)
+    
+    #### add blast as further hierarchicak classification
+    #blast="/usr/local/ncbi/blast/bin/blastn"
+    hieDB_prefix="${hieDBs%.*}"  # remove extension
+
+    if [[ ! -f "${hieDB_prefix}.ndb" ]]; then
+      echo "BLAST database not found. Creating with makeblastdb..."
+      blast_dir="$(dirname "$blast")"
+      makeblastdb="$blast_dir/makeblastdb"
+      $makeblastdb -in "$hieDBs" -dbtype nucl -out "$hieDB_prefix"
+    else
+      echo "BLAST database found. Skipping creation."
+    fi
+
+    # run blast
+    $blast -query asvs.direct.$countdb.uc.nohit.fasta -db "$hieDB_prefix" \
+      -outfmt "6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore staxids" \
+      -max_target_seqs 50 -num_threads $threads -out asvs.blast_output.tsv
+
+    python ../_resources/python/infer_lca.py asvs.blast_output.tsv asvs.blast_output.tsv.lca
+
+    python ../_resources/python/combine_taxonomy.py --blast asvs.blast_output.tsv.lca --sintax asvs.uc.merge.nohit.sintax --output  asvs.blast-lca_sintax.out --greedy
+
+
+else
+    # Use just SINTAX
+    cut -f1,4 asvs.uc.merge.nohit.sintax | sed -E -e "s/\_[0-9]+//g" -e "s/,s:.*$//"  >> taxonomy.vsearch
+fi
+
 
 # v3 idea [TODO]: phylo + spc estimation on sintax results
 

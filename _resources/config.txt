@@ -42,9 +42,11 @@ postcluster=97 # leave 0 for no postclustering of ASVs, otherwise percent identi
 # classification
 tax_threshold=97 # perc identity threshold for classification
 sintax_cutoff=0.9
+use_blast_sintax_combination = 1
 
 # Paths to binaries
 seqfilter=PATH/TO/BINARY/OF/SeqFilter
 vsearch=PATH/TO/BINARY/OF/vsearch
 mafft="PATH/TO/BINARY/OF/mafft"    # only if phylogeny=1
 raxml="PATH/TO/BINARY/OF/raxml-ng"  # only if phylogeny=1  
+blast="PATH/TO/BINARY/OF/blastn"  # only if use_blast_sintax_combination=1  
