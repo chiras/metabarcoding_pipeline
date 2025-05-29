@@ -410,7 +410,11 @@ if [ "$use_blast_sintax_combination" -eq 1 ]; then
 
     python ../_resources/python/infer_lca.py asvs.blast_output.tsv asvs.blast_output.tsv.lca
 
-    python ../_resources/python/combine_taxonomy.py --blast asvs.blast_output.tsv.lca --sintax asvs.uc.merge.nohit.sintax --output  asvs.blast-lca_sintax.out --greedy
+    if [ "$use_blast_sintax_combination_greedy" -eq 1 ]; then
+      greedy="--greedy"
+    fi
+
+    python ../_resources/python/combine_taxonomy.py --blast asvs.blast_output.tsv.lca --sintax asvs.uc.merge.nohit.sintax --output  asvs.blast-lca_sintax.out $greedy
 
 
 else
