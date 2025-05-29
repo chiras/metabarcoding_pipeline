@@ -54,6 +54,8 @@ if [ $classificationOnly -ne 1 ]
 if [ $skip_preprocessing -ne 1 ]
   then
 
+mkdir -p logs/preprocessing
+
   echo "-- decompressing raw files"
   #extracting files
   find . -name '*.gz' -print0 | xargs -0 -I {} -P $threads gunzip {}
@@ -84,13 +86,13 @@ for f in *_R1_*.fastq; do
           --fastq_trunclen_keep $cutend_fw \
           --fastq_truncee 3 \
           --fastqout $f.sl.fq \
-          --threads $threads 2> logs/vsearch.rtf.$s.log
+          --threads $threads 2> logs/preprocessing/vsearch.rtf.$s.log
 
     $vsearch --fastq_filter $r \
           --fastq_trunclen_keep $cutend_rv \
           --fastq_truncee 3 \
           --fastqout $r.sl.fq \
-          --threads $threads 2> logs/vsearch.rtf.$s.log
+          --threads $threads 2> logs/preprocessing/vsearch.rtf.$s.log
 
     # Merging reads
     $vsearch --fastq_mergepairs $f.sl.fq \
@@ -101,9 +103,9 @@ for f in *_R1_*.fastq; do
           --fastqout $s.merge.fq \
           --fastq_eeout \
           --relabel R1+2-${s}_ \
-          --threads $threads  2> logs/vsearch.m.$s.log
+          --threads $threads  2> logs/preprocessing/vsearch.m.$s.log
 
-    merged_reads=$(grep "Merged" logs/vsearch.m.$s.log )
+    merged_reads=$(grep "Merged" logs/preprocessing/vsearch.m.$s.log )
     echo "$s : $merged_reads" | tee -a logs/_merging.log
     merged_reads=$(echo $merged_reads | grep -o '[0-9]*' | head -n 1)
 
@@ -117,9 +119,9 @@ for f in *_R1_*.fastq; do
       --fastq_maxns $fastq_maxns \
       --fastaout $s.mergefiltered.fa  \
       --fasta_width 0 \
-      --threads $threads 2> logs/vsearch.mf.$s.log
+      --threads $threads 2> logs/preprocessing/vsearch.mf.$s.log
 
-    filtered_reads=$(grep "sequences kept" logs/vsearch.mf.$s.log )
+    filtered_reads=$(grep "sequences kept" logs/preprocessing/vsearch.mf.$s.log )
     echo "$s : $filtered_reads" | tee -a logs/_filter.log
     filtered_reads=$(echo $filtered_reads | grep -o '[0-9]*' | head -n 1)
 
@@ -129,9 +131,9 @@ for f in *_R1_*.fastq; do
           --fastq_minlen $fastq_minlen2 \
           --fastaout $s.trunc.fa \
           --relabel R1-${s}_ \
-          --threads $threads 2> logs/vsearch.tf.$s.log
+          --threads $threads 2> logs/preprocessing/vsearch.tf.$s.log
 
-    trunc_reads=$(grep "sequences kept" logs/vsearch.tf.$s.log )
+    trunc_reads=$(grep "sequences kept" logs/preprocessing/vsearch.tf.$s.log )
     echo "$s : $trunc_reads" | tee -a logs/_truncfilter.log
     trunc_reads=$(echo $trunc_reads | grep -o '[0-9]*' | head -n 1)
 
