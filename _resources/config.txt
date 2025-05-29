@@ -42,8 +42,8 @@ postcluster=97          # leave 0 for no postclustering of ASVs, otherwise perce
 # classification
 tax_threshold=97 # perc identity threshold for classification
 sintax_cutoff=0.9
-use_blast_sintax_combination = 1            # Allows to make additional blast to generate a hierarchical classification by LCA of 50 (filtered by cov and pid)
-use_blast_sintax_combination_greedy = 1     # 1 use a greedy combination of SINTAX / BLAST-LCA, or 0 be more conservative in those confirmed by both
+use_blast_sintax_combination=1            # Allows to make additional blast to generate a hierarchical classification by LCA of 50 (filtered by cov and pid)
+use_blast_sintax_combination_greedy=1     # 1 use a greedy combination of SINTAX / BLAST-LCA, or 0 be more conservative in those confirmed by both
 
 # Paths to binaries
 seqfilter=PATH/TO/BINARY/OF/SeqFilter
