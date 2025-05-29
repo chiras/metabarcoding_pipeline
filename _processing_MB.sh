@@ -386,7 +386,7 @@ python ../_resources/python/sintax_overview.py asvs.uc.merge.nohit.sintax
 
 
 if [ "$use_blast_sintax_combination" -eq 1 ]; then
-echo "-- LCA BLAST classification";
+    echo "-- LCA BLAST classification";
 
     # Run combined taxonomy merge script (your python script)
     
