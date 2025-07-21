@@ -92,8 +92,8 @@ ggplot(controls.melt.rel, aes(x=species, y=Abundance, col=Type))+geom_boxplot()+
   theme(axis.text.x=element_text(angle = -90, hjust = 0))
 dev.off()
 
-data.species <- subset_samples(data.species.rel, !(Type %in% control_samples))
-data.species <- subset_samples(data.species.rel, !(Type %in% control_samples))
+data.species <- subset_samples(data.species, !(Type %in% control_samples))
+data.species.rel <- subset_samples(data.species.rel, !(Type %in% control_samples))
 
 # low abundance filtering
 otu_table(data.species.rel)[otu_table(data.species.rel)<0.01 ]<-0
