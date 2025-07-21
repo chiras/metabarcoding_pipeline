@@ -56,15 +56,44 @@ taxa_names(data.species) <- tax_table(data.species)[,"species"]
 (data.species <- label_low_throughput(data.species , 500))
 sample_names(data.species)
 
-## (optional) consider looking at controls and
-### control_samples = c("negative","positive")
-### controls <- subset_samples(data.species, id %in% control_samples)
-### controls <- prune_taxa(taxa_sums(controls)>100, controls)
-### plot_bar(controls, x="species", facet_grid= notes~.)
-### data.species <- subset_samples(data.species, !(id %in% control_samples))
-
 # Transform to relative data
 data.species.rel = transform_sample_counts(data.species, function(x) x/sum(x))
+
+## (optional) consider looking at controls and
+control_samples = c("negative","positive")
+
+pdf("plots/controls_absolute.pdf", width=5, height=5)
+
+controls <- subset_samples(data.species, Type %in% control_samples)
+controls <- prune_taxa(taxa_sums(controls)>100, controls)
+controls.melt <- psmelt(controls)
+ggplot(controls.melt, aes(x=species, y=Abundance, col=Type))+geom_boxplot()+  
+  theme(axis.text.x=element_text(angle = -90, hjust = 0))
+dev.off()
+
+pdf("plots/controls_relative.pdf", width=15, height=5)
+
+controls.rel <- subset_samples(data.species.rel, Type %in% control_samples)
+controls.rel <- prune_taxa(taxa_sums(controls.rel)>0.1, controls.rel)
+controls.melt.rel <- psmelt(controls.rel)
+controls.melt.rel  <- controls.melt.rel %>% filter(Abundance > 0.001)
+
+ggplot(controls.melt.rel, aes(x=species, y=Abundance, col=Type))+geom_boxplot()+scale_y_log10()+ 
+  geom_hline(yintercept = c(0.01, 0.1, 0.001, 0.0001), 
+             linetype = "dashed", color = "red") +
+  annotate("text", x = 10, y = 0.01, 
+           label = "0.01", hjust = 1, vjust = -0.5, color = "red") +
+  annotate("text", x = 10, y = 0.1, 
+           label = "0.1", hjust = 1, vjust = -0.5, color = "red") +
+  annotate("text", x = 10, y = 0.001, 
+           label = "0.001", hjust = 1, vjust = -0.5, color = "red") +
+  annotate("text", x = 10, y = 0.0001, 
+           label = "0.0001", hjust = 1, vjust = -0.5, color = "red")+  
+  theme(axis.text.x=element_text(angle = -90, hjust = 0))
+dev.off()
+
+data.species <- subset_samples(data.species.rel, !(Type %in% control_samples))
+data.species <- subset_samples(data.species.rel, !(Type %in% control_samples))
 
 # low abundance filtering
 otu_table(data.species.rel)[otu_table(data.species.rel)<0.01 ]<-0
