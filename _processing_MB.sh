@@ -11,6 +11,7 @@
 
 githash=$(git log -1 --pretty=format:%h)
 gitversion=$(git log --pretty=format:%h | wc -l)
+set -o pipefail
 
 if [ -z "$1" ]; then
   echo 'No directory supplied' >&2
@@ -262,14 +263,82 @@ fi #end skip preprocessing
   echo "===================================="
 
   echo "-- derep"
+  derep_chunk_threshold=50000000
+  derep_chunk_records=10000000
 
-  $vsearch --derep_fulllength all.merge.fasta.noprimer.fasta \
-    --minuniquesize 2 \
-    --sizein \
-    --sizeout \
-    --fasta_width 0 \
-    --uc all.merge.derep.uc \
-    --output all.merge.derep.fa 2> logs/_derep.log
+  derep_input="all.merge.fasta.noprimer.fasta"
+  derep_output="all.merge.derep.fa"
+  derep_uc="all.merge.derep.uc"
+
+  # Number of FASTA records above which chunked dereplication is used
+  # 2-line FASTA is assumed because primer removal writes fasta_width 0
+  derep_chunk_threshold="${derep_chunk_threshold:-50000000}"
+
+  # Number of FASTA records per chunk
+  derep_chunk_records="${derep_chunk_records:-10000000}"
+
+  derep_records=$(grep -c "^>" "$derep_input")
+
+  echo "Dereplication input records: $derep_records"
+
+  if [[ "$derep_records" -gt "$derep_chunk_threshold" ]]; then
+      echo "Large input detected. Using chunked dereplication."
+
+      mkdir -p tmp/derep_chunks tmp/derep_out logs/derep_chunks
+
+      rm -f tmp/derep_chunks/chunk_* tmp/derep_out/*.derep.fa all.merge.derep.stage1.fa
+
+      # FASTA is 2 lines per record because sequences are width 0
+      split_lines=$(( derep_chunk_records * 2 ))
+
+      split -l "$split_lines" "$derep_input" tmp/derep_chunks/chunk_
+
+      for chunk in tmp/derep_chunks/chunk_*; do
+          base=$(basename "$chunk")
+
+          "$vsearch" --derep_fulllength "$chunk" \
+            --minuniquesize 1 \
+            --sizein \
+            --sizeout \
+            --fasta_width 0 \
+            --output "tmp/derep_out/${base}.derep.fa" \
+            2> "logs/derep_chunks/${base}.log"
+
+          if [[ $? -ne 0 || ! -s "tmp/derep_out/${base}.derep.fa" ]]; then
+              echo "ERROR: chunk dereplication failed for $chunk"
+              echo "Check logs/derep_chunks/${base}.log"
+              exit 1
+          fi
+      done
+
+      cat tmp/derep_out/*.derep.fa > all.merge.derep.stage1.fa
+
+      "$vsearch" --derep_fulllength all.merge.derep.stage1.fa \
+        --minuniquesize 2 \
+        --sizein \
+        --sizeout \
+        --fasta_width 0 \
+        --uc "$derep_uc" \
+        --output "$derep_output" \
+        2> logs/_derep.log
+
+  else
+      echo "Input below chunk threshold. Using standard dereplication."
+
+      "$vsearch" --derep_fulllength "$derep_input" \
+        --minuniquesize 2 \
+        --sizein \
+        --sizeout \
+        --fasta_width 0 \
+        --uc "$derep_uc" \
+        --output "$derep_output" \
+        2> logs/_derep.log
+  fi
+
+  if [[ $? -ne 0 || ! -s "$derep_output" ]]; then
+      echo "ERROR: dereplication failed. Check logs/_derep.log"
+      exit 1
+  fi
 
   echo "-- denoise"
   $vsearch --cluster_unoise  all.merge.derep.fa \
