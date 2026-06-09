@@ -61,16 +61,12 @@ if [ $skip_preprocessing -ne 1 ]
   then
 
 mkdir -p logs/preprocessing
-
-  echo "-- decompressing raw files"
-  #extracting files
-  find . -name '*.gz' -print0 | xargs -0 -I {} -P $threads gunzip {}
-
+cd raw
+echo "-- decompressing raw files"
+find . -name '*.gz' -print0 | xargs -0 -I {} -P $threads gunzip {}
 
 # Define the header of the log file
-echo "sample_name,project,total_reads,merged_reads,filtered_reads,truncated_reads,filter_strategy,filter_file,final_reads,*sample_name,sample_title,*organism,*collection_date,*env_broad_scale,*env_local_scale,*env_medium,*geo_loc_name,*host,*lat_lon,elev,source_material_id,description" > logs/_consolidated_log.csv
-
-#   echo "project;name;host;collectionDate;location;country;bioregion;latitude;longitude;tissue;treatment;sampletype;notes" > ../$project.$nowformat/samples.csv
+echo "sample_name,project,total_reads,merged_reads,filtered_reads,truncated_reads,filter_strategy,filter_file,final_reads,*sample_name,sample_title,*organism,*collection_date,*env_broad_scale,*env_local_scale,*env_medium,*geo_loc_name,*host,*lat_lon,elev,source_material_id,description" > ../logs/_consolidated_log.csv
 
 # Loop through all files for merging
 echo "-- Starting merging and filtering --"
@@ -107,13 +103,13 @@ for f in *_R1_*.fastq; do
           --fastq_trunclen_keep $cutend_fw \
           --fastq_truncee 3 \
           --fastqout $f.sl.fq \
-          --threads $threads 2> logs/preprocessing/vsearch.rtf.$s.log
+          --threads $threads 2> ../logs/preprocessing/vsearch.rtf.$s.log
 
     $vsearch --fastq_filter $r \
           --fastq_trunclen_keep $cutend_rv \
           --fastq_truncee 3 \
           --fastqout $r.sl.fq \
-          --threads $threads 2> logs/preprocessing/vsearch.rtf.$s.log
+          --threads $threads 2> ../logs/preprocessing/vsearch.rtf.$s.log
 
     # Merging reads
     $vsearch --fastq_mergepairs $f.sl.fq \
@@ -124,10 +120,10 @@ for f in *_R1_*.fastq; do
           --fastqout $s.merge.fq \
           --fastq_eeout \
           --relabel R1+2-${s}_ \
-          --threads $threads  2> logs/preprocessing/vsearch.m.$s.log
+          --threads $threads  2> ../logs/preprocessing/vsearch.m.$s.log
 
-    merged_reads=$(grep "Merged" logs/preprocessing/vsearch.m.$s.log )
-    echo "$s : $merged_reads" | tee -a logs/_merging.log
+    merged_reads=$(grep "Merged" ../logs/preprocessing/vsearch.m.$s.log )
+    echo "$s : $merged_reads" | tee -a ../logs/_merging.log
     merged_reads=$(echo $merged_reads | grep -o '[0-9]*' | head -n 1)
 
     # Quality filtering on merged reads
@@ -140,10 +136,10 @@ for f in *_R1_*.fastq; do
       --fastq_maxns $fastq_maxns \
       --fastaout $s.mergefiltered.fa  \
       --fasta_width 0 \
-      --threads $threads 2> logs/preprocessing/vsearch.mf.$s.log
+      --threads $threads 2> ../logs/preprocessing/vsearch.mf.$s.log
 
-    filtered_reads=$(grep "sequences kept" logs/preprocessing/vsearch.mf.$s.log )
-    echo "$s : $filtered_reads" | tee -a logs/_filter.log
+    filtered_reads=$(grep "sequences kept" ../logs/preprocessing/vsearch.mf.$s.log )
+    echo "$s : $filtered_reads" | tee -a ../logs/_filter.log
     filtered_reads=$(echo $filtered_reads | grep -o '[0-9]*' | head -n 1)
 
     # Truncation filtering
@@ -152,10 +148,10 @@ for f in *_R1_*.fastq; do
           --fastq_minlen $fastq_minlen2 \
           --fastaout $s.trunc.fa \
           --relabel R1-${s}_ \
-          --threads $threads 2> logs/preprocessing/vsearch.tf.$s.log
+          --threads $threads 2> ../logs/preprocessing/vsearch.tf.$s.log
 
-    trunc_reads=$(grep "sequences kept" logs/preprocessing/vsearch.tf.$s.log )
-    echo "$s : $trunc_reads" | tee -a logs/_truncfilter.log
+    trunc_reads=$(grep "sequences kept" ../logs/preprocessing/vsearch.tf.$s.log )
+    echo "$s : $trunc_reads" | tee -a ../logs/_truncfilter.log
     trunc_reads=$(echo $trunc_reads | grep -o '[0-9]*' | head -n 1)
 
     # Apply conditions for selecting the best file
@@ -228,7 +224,7 @@ for f in *_R1_*.fastq; do
     fi
 
     # Log results to consolidated CSV file
-    echo "$s,$project,$total,$merged_reads,$filtered_reads,$trunc_reads,$strategy,$selected_file,$selected_reads,$sample_name,$sample_name,metagenome,,,,,,,,,," >> logs/_consolidated_log.csv
+    echo "$s,$project,$total,$merged_reads,$filtered_reads,$trunc_reads,$strategy,$selected_file,$selected_reads,$sample_name,$sample_name,metagenome,,,,,,,,,," >> ../logs/_consolidated_log.csv
 
     # Display selection summary
     echo "Selected $strategy: $selected_file ($selected_reads reads)"
