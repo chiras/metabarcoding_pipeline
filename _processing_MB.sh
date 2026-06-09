@@ -263,8 +263,6 @@ fi #end skip preprocessing
   echo "===================================="
 
   echo "-- derep"
-  derep_chunk_threshold=50000000
-  derep_chunk_records=10000000
 
   derep_input="all.merge.fasta.noprimer.fasta"
   derep_output="all.merge.derep.fa"
@@ -288,13 +286,42 @@ fi #end skip preprocessing
 
       rm -f tmp/derep_chunks/chunk_* tmp/derep_out/*.derep.fa all.merge.derep.stage1.fa
 
-      # FASTA is 2 lines per record because sequences are width 0
-      split_lines=$(( derep_chunk_records * 2 ))
+      # FASTA-aware split by record count.
+      # This is safe for both wrapped and unwrapped FASTA.
+      awk -v records_per_file="$derep_chunk_records" \
+          -v outdir="tmp/derep_chunks" '
+          BEGIN {
+              file_index = 0
+              record_count = 0
+          }
+          /^>/ {
+              if (record_count % records_per_file == 0) {
+                  if (out) close(out)
+                  file_index++
+                  out = sprintf("%s/chunk_%05d.fa", outdir, file_index)
+              }
+              record_count++
+          }
+          {
+              print > out
+          }
+      ' "$derep_input"
 
-      split -l "$split_lines" "$derep_input" tmp/derep_chunks/chunk_
+      total_chunks=$(find tmp/derep_chunks -type f -name "chunk_*.fa" | wc -l | tr -d ' ')
+      chunk_i=0
 
-      for chunk in tmp/derep_chunks/chunk_*; do
-          base=$(basename "$chunk")
+      echo "Created $total_chunks dereplication chunks."
+
+      if [[ "$total_chunks" -eq 0 ]]; then
+          echo "ERROR: splitting produced no chunks."
+          exit 1
+      fi
+
+      for chunk in tmp/derep_chunks/chunk_*.fa; do
+          chunk_i=$((chunk_i + 1))
+          base=$(basename "$chunk" .fa)
+
+          echo "-- Chunk dereplication $chunk_i / $total_chunks: $base"
 
           "$vsearch" --derep_fulllength "$chunk" \
             --minuniquesize 1 \
@@ -311,7 +338,11 @@ fi #end skip preprocessing
           fi
       done
 
+
+      echo "-- Concatenating chunk-level dereplicated files"
       cat tmp/derep_out/*.derep.fa > all.merge.derep.stage1.fa
+
+      echo "-- Final global dereplication after chunking"
 
       "$vsearch" --derep_fulllength all.merge.derep.stage1.fa \
         --minuniquesize 2 \
