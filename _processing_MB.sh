@@ -191,7 +191,7 @@ for f in *_R1_*.fastq; do
     fi
 
     # Output the selected file and copy it as final selection
-    cp "$selected_file" "$s.selection.fa"
+    cp "$selected_file" "../$s.selection.fa"
 
     if [[ "$compress_intermediates" -eq 1 ]]; then
         echo "Compressing and moving intermediate files for $s"
@@ -217,7 +217,7 @@ for f in *_R1_*.fastq; do
 
                 # Move compressed intermediate to tmp folder
                 if [[ -f "$tmpfile" ]]; then
-                    mv "$tmpfile" "tmp/preprocessing/"
+                    mv "$tmpfile" "../tmp/preprocessing/"
                 fi
             fi
         done
@@ -230,21 +230,11 @@ for f in *_R1_*.fastq; do
     echo "Selected $strategy: $selected_file ($selected_reads reads)"
     echo ""
 done
-
+cd ..
 cat *selection.fa > all.merge.fasta
 
-fi #end skippp
+fi #end skip preprocessing
 
-  #cat *trunc.fa > all.trunc.fasta
-
-  if [ $use_fw_only -eq 1 ]
-    then
-      cp all.merge.fasta all.merge.fasta.bak
-      cp all.trunc.fasta all.merge.fasta
-      echo " "
-      echo "!!! INFO: using forward reads only"
-      echo " "
-  fi #end useFWonly
 
     # cleanup
     echo "-- cleanup"
