@@ -6,6 +6,8 @@ import os
 if not os.path.exists("logs"):
     os.makedirs("logs")
 
+TAXONOMIC_RANKS = ["d", "k", "p", "c", "o", "f", "g", "s"]
+
 def parse_taxonomy_string(tax_string):
     """Convert taxonomy string into dict of rank:taxon"""
     tax_dict = {}
@@ -34,7 +36,7 @@ def detect_rank_order(tax_lines):
 
 def merge_taxonomies(asv, blast_tax, sintax_tax, w_blast=0.6, w_sintax=0.4, greedy=False):    
     final_tax = {}
-    all_ranks = sorted(set(blast_tax.keys()) | set(sintax_tax.keys()))
+    all_ranks = [r for r in TAXONOMIC_RANKS if r in blast_tax or r in sintax_tax]
 
     for r in all_ranks:
         b_val = blast_tax.get(r)
@@ -43,17 +45,21 @@ def merge_taxonomies(asv, blast_tax, sintax_tax, w_blast=0.6, w_sintax=0.4, gree
         if b_val == s_val and b_val is not None:
             final_tax[r] = b_val
         elif greedy:
-            # Assign any available non-conflicting taxonomy
-            final_tax[r] = b_val or s_val
+            # Take whichever is filled if only one is filled
+            if b_val and not s_val:
+                final_tax[r] = b_val
+            elif s_val and not b_val:
+                final_tax[r] = s_val
+            # If both filled and disagree, skip this rank
         elif b_val and s_val:
-            # Prefer based on weight
             final_tax[r] = b_val if w_blast >= w_sintax else s_val
         elif b_val:
             final_tax[r] = b_val
         elif s_val:
             final_tax[r] = s_val
 
-    return final_tax 
+    return final_tax
+
 
 
 def format_tax_dict(tax_dict, rank_order):
@@ -91,8 +97,8 @@ def main(blast_file, sintax_file, output_file, w_blast, w_sintax, greedy):
             sintax[asv] = parse_taxonomy_string(tax)
 
     # Detect rank order from combined sources
-    rank_order = detect_rank_order(blast_lines + sintax_lines)
-
+    #rank_order = detect_rank_order(blast_lines + sintax_lines)
+    rank_order = TAXONOMIC_RANKS
     # Merge
     all_asvs = set(blast.keys()) | set(sintax.keys())
     unmatched = []
@@ -121,9 +127,9 @@ def main(blast_file, sintax_file, output_file, w_blast, w_sintax, greedy):
     print(f"  - Found in both: {len(set(blast) & set(sintax))}")
     print(f"  - Unmatched in both: {len(unmatched)}")
     print()
-    print("=== Sample Merged Entries ===")
-    for asv, b_len, s_len, m_len in detailed_report[:10]:
-        print(f"{asv}: BLAST={b_len} ranks, SINTAX={s_len} ranks -> Combined={m_len}")
+   # print("=== Sample Merged Entries ===")
+  #  for asv, b_len, s_len, m_len in detailed_report[:10]:
+   #     print(f"{asv}: BLAST={b_len} ranks, SINTAX={s_len} ranks -> Combined={m_len}")
 
     blast_only = set(blast) - set(sintax)
     sintax_only = set(sintax) - set(blast)
