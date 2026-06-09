@@ -69,10 +69,25 @@ echo "sample_name,project,total_reads,merged_reads,filtered_reads,truncated_read
 echo "-- Starting merging and filtering --"
 for f in *_R1_*.fastq; do
 
-    # Initialize variables for this sample
-    r=$(sed -e "s/_R1_/_R2_/" <<< "$f")
-    s=$(echo $f | sed "s/_L001.*//g")
-    total=$(grep "^@" $f | wc -l)
+    # Derive R2 filename
+    r="${f/_R1_/_R2_}"
+
+    # Check that R2 exists
+    if [[ ! -f "$r" ]]; then
+        echo "ERROR: Missing reverse read for $f"
+        echo "Expected: $r"
+        continue
+    fi
+
+    # Derive sample name robustly for both naming schemes
+    s="$f"
+    s="${s%.fastq}"
+    s="${s%.fq}"
+    s="${s/_L001_R1_001/}"
+    s="${s/_R1_001/}"
+    s="${s/_R1_/}"
+
+    total=$(( $(wc -l < "$f") / 4 ))
 
     echo "===================================="
     echo "Processing sample $s"
@@ -210,7 +225,9 @@ fi #end skippp
       python ../_resources/python/remove_primers_2.py \
         --input all.merge.fasta \
         --output all.merge.fasta.noprimer.fasta \
-        --marker "$marker"
+        --marker "$marker" \
+        --max-5p-prefix-stagger "$max_5p_prefix_stagger" \
+        --max-3p-suffix-stagger "$max_3p_suffix_stagger"
   else
     echo "Skipping primer removal because skip_primerremoval == 1"
     cp all.merge.fasta all.merge.fasta.noprimer.fasta
@@ -385,42 +402,50 @@ $vsearch --sintax asvs.direct.$countdb.uc.nohit.fasta \
 
 python ../_resources/python/sintax_overview.py asvs.uc.merge.nohit.sintax
 
-
 if [ "$use_blast_sintax_combination" -eq 1 ]; then
-    echo "-- LCA BLAST classification";
+    echo "-- LCA BLAST classification"
 
-    # Run combined taxonomy merge script (your python script)
-    
-    #### add blast as further hierarchicak classification
-    #blast="/usr/local/ncbi/blast/bin/blastn"
-    hieDB_prefix="${hieDBs%.*}"  # remove extension
+    hieDB_prefix="${hieDBs%.*}"
 
     if [[ ! -f "${hieDB_prefix}.ndb" ]]; then
-      echo "BLAST database not found. Creating with makeblastdb..."
-      blast_dir="$(dirname "$blast")"
-      makeblastdb="$blast_dir/makeblastdb"
-      $makeblastdb -in "$hieDBs" -dbtype nucl -out "$hieDB_prefix"
+        echo "BLAST database not found. Creating with makeblastdb..."
+
+        if [[ ! -x "$makeblastdb" ]]; then
+            echo "ERROR: makeblastdb not found or not executable: $makeblastdb"
+            exit 1
+        fi
+
+        "$makeblastdb" -in "$hieDBs" -dbtype nucl -out "$hieDB_prefix"
     else
-      echo "BLAST database found. Skipping creation."
+        echo "BLAST database found. Skipping creation."
     fi
 
-    # run blast
-    $blast -query asvs.direct.$countdb.uc.nohit.fasta -db "$hieDB_prefix" \
-      -outfmt "6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore staxids" \
-      -max_target_seqs 50 -num_threads $threads -out asvs.blast_output.tsv
+    if [[ ! -x "$blastn" ]]; then
+        echo "ERROR: blastn not found or not executable: $blastn"
+        exit 1
+    fi
+
+    "$blastn" -query "asvs.direct.$countdb.uc.nohit.fasta" -db "$hieDB_prefix" \
+        -outfmt "6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore staxids" \
+        -max_target_seqs 50 \
+        -num_threads "$threads" \
+        -out asvs.blast_output.tsv
 
     python ../_resources/python/infer_lca.py asvs.blast_output.tsv asvs.blast_output.tsv.lca
 
+    greedy=""
     if [ "$use_blast_sintax_combination_greedy" -eq 1 ]; then
-      greedy="--greedy"
+        greedy="--greedy"
     fi
 
-    python ../_resources/python/combine_taxonomy.py --blast asvs.blast_output.tsv.lca --sintax asvs.uc.merge.nohit.sintax --output  asvs.blast-lca_sintax.out $greedy
-
-
+    python ../_resources/python/combine_taxonomy.py \
+        --blast asvs.blast_output.tsv.lca \
+        --sintax asvs.uc.merge.nohit.sintax \
+        --output asvs.blast-lca_sintax.out \
+        $greedy
 else
-    # Use just SINTAX
-    cut -f1,4 asvs.uc.merge.nohit.sintax | sed -E -e "s/\_[0-9]+//g" -e "s/,s:.*$//"  >> taxonomy.vsearch
+    cut -f1,4 asvs.uc.merge.nohit.sintax | \
+        sed -E -e "s/_[0-9]+//g" -e "s/,s:.*$//" >> taxonomy.vsearch
 fi
 
 
