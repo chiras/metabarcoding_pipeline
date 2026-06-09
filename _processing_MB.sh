@@ -48,6 +48,13 @@ mkdir -p logs
 mkdir -p raw
 mkdir -p tmp
 
+# Compression tool for intermediate files
+if command -v pigz >/dev/null 2>&1; then
+    gzip_cmd="pigz -p $threads -1"
+else
+    gzip_cmd="gzip -1"
+fi
+
 if [ $classificationOnly -ne 1 ]
   then
 if [ $skip_preprocessing -ne 1 ]
@@ -189,6 +196,22 @@ for f in *_R1_*.fastq; do
 
     # Output the selected file and copy it as final selection
     cp "$selected_file" "$s.selection.fa"
+
+    if [[ "$compress_intermediates" -eq 1 ]]; then
+        echo "Compressing intermediate files for $s"
+
+        for tmpfile in \
+            "$f.sl.fq" \
+            "$r.sl.fq" \
+            "$s.merge.fq" \
+            "$s.mergefiltered.fa" \
+            "$s.trunc.fa"
+        do
+            if [[ -f "$tmpfile" && "$tmpfile" != "$selected_file" && ! -f "$tmpfile.gz" ]]; then
+                $gzip_cmd "$tmpfile"
+            fi
+        done
+    fi
 
     # Log results to consolidated CSV file
     echo "$s,$project,$total,$merged_reads,$filtered_reads,$trunc_reads,$strategy,$selected_file,$selected_reads,$sample_name,$sample_name,metagenome,,,,,,,,,," >> logs/_consolidated_log.csv
