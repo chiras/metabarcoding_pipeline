@@ -168,15 +168,26 @@ get_species_occurences_long <- function(phyloseq, notInGBIF = T){
 #### Custom functions
 #Propagate taxonomie for tax_glom to work
 propagate_incomplete_taxonomy <- function(phyloseq){
-	taxranks <- colnames(tax_table(phyloseq))
-	for (i in 2:length(taxranks)){
-	  if (sum(sum(tax_table(phyloseq)[,taxranks[i]]==""))>1){
-		tax_table(phyloseq)[tax_table(phyloseq)[,taxranks[i]]=="",taxranks[i]]<-paste(tax_table(phyloseq)[tax_table(phyloseq)[,taxranks[i]]=="",taxranks[i-1]],"_spc",sep="")
-	  }
-	}
-	  return(phyloseq)
-}
+  tax <- as.data.frame(tax_table(phyloseq))
+  tax[is.na(tax)] <- ""
+  taxranks <- colnames(tax)
 
+  for (i in 2:length(taxranks)){
+    empty_current <- tax[, taxranks[i]] == ""
+    previous_known <- tax[, taxranks[i - 1]] != ""
+    fill_rows <- empty_current & previous_known
+
+    if (sum(fill_rows, na.rm = TRUE) > 0){
+      tax[fill_rows, taxranks[i]] <- paste0(
+        tax[fill_rows, taxranks[i - 1]],
+        "_spc"
+      )
+    }
+  }
+
+  tax_table(phyloseq) <- tax_table(as.matrix(tax))
+  return(phyloseq)
+}
 
 
 #Make taxa labels nice for plots
