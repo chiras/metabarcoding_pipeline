@@ -412,306 +412,398 @@ fi #end skip preprocessing
     echo "$clusterin ASVs post-clustered to $clusterout pASVs"
   fi
 
-  ### create community table
-  echo "-- add barcodelabel"
-  python ../_resources/python/add_barcodelabel.py -i all.merge.fasta.noprimer.fasta -o all.merge.bc.fasta
+echo "-- add barcodelabel"
+python ../_resources/python/add_barcodelabel.py \
+  -i all.merge.fasta.noprimer.fasta \
+  -o all.merge.bc.fasta
+
+if [[ "${mixed_marker_run:-0}" -eq 1 && "${#marker_groups[@]}" -gt 1 ]]; then
+    echo "-- assign ASVs to marker groups"
+
+    python ../_resources/python/assign_asv_marker_groups.py \
+      --asv-fasta asvs.merge.fa \
+      --config config.txt \
+      --vsearch "$vsearch" --min-delta "${marker_assignment_min_delta:-2}" \
+      --threshold "$tax_threshold" \
+      --threads "$threads" \
+      --outdir marker_split
+
+    echo "-- split ASV FASTA by marker group"
+
+    for marker_i in "${!marker_groups[@]}"; do
+        marker_name="${marker_groups[$marker_i]}"
+        marker_safe=$(echo "$marker_name" | sed 's/[^A-Za-z0-9_.-]/_/g')
+
+        python ../_resources/python/subset_fasta.py \
+            -i asvs.merge.fa \
+            -l "marker_split/${marker_safe}.ids" \
+            -o "asvs.${marker_safe}.fa" \
+            --exact_match
+    done
+
+else
+    echo "-- single marker mode: no ASV marker split"
+
+    marker_name="${marker:-${marker_groups[0]:-marker}}"
+    marker_safe=$(echo "$marker_name" | sed 's/[^A-Za-z0-9_.-]/_/g')
+
+    cp asvs.merge.fa "asvs.${marker_safe}.fa"
+fi
 
  echo "-- map data against ASVs"
- $vsearch --usearch_global all.merge.bc.fasta --db asvs.merge.fa --strand plus --id 0.97 --uc map.merge.uc --otutabout asv.tab-csv --sizeout --threads $threads 2> logs/_mapping.log
 
+for marker_i in "${!marker_groups[@]}"; do
+    marker_name="${marker_groups[$marker_i]}"
+    marker_safe=$(echo "$marker_name" | sed 's/[^A-Za-z0-9_.-]/_/g')
 
-  grep "Matching" logs/_mapping.log
+    asv_fasta_marker="asvs.${marker_safe}.fa"
+    asv_table_marker="asv_table.${marker_safe}.txt"
+    map_uc_marker="map.${marker_safe}.uc"
 
-  echo "-- create output folder $project.$nowformat; add first files"
+    if [[ ! -s "$asv_fasta_marker" ]]; then
+        echo "WARNING: no ASVs for marker group $marker_name. Skipping mapping."
+        continue
+    fi
 
-  # copy final files into folde
-  mkdir -p ../$project.$nowformat
-  cp config.txt ../$project.$nowformat/config.txt
-  cp asvs.merge.fa ../$project.$nowformat/asvs.merge.fa
-  # cp asv_table.merge.txt ../$project.$nowformat/asv_table.merge.txt
-  cp asv.tab-csv ../$project.$nowformat/asv_table.merge.txt
+    echo "-- map data against ASVs for marker group: $marker_name"
 
-  # prepare final project information file
-  echo "name;id;own;year;marker;description;participants;doi;repository;accession;ignore" > ../$project.$nowformat/project.csv
-  echo "$project;$project;1;$nowformat;$marker;;;;;;" >> ../$project.$nowformat/project.csv
+    $vsearch --usearch_global all.merge.bc.fasta \
+      --db "$asv_fasta_marker" \
+      --strand plus \
+      --id 0.97 \
+      --uc "$map_uc_marker" \
+      --otutabout "$asv_table_marker" \
+      --sizeout \
+      --threads "$threads" \
+      2> "logs/_mapping.${marker_safe}.log"
 
-  # prepare final sample information file
-  echo "project;name;host;collectionDate;location;country;bioregion;latitude;longitude;tissue;treatment;sampletype;notes" > ../$project.$nowformat/samples.csv
-  head -n 1 asv.tab-csv | sed -e "s/#OTU ID[[:space:]]//g" | tr "\t" "\n" | sed "s/^/$project;/"  >> ../$project.$nowformat/samples.csv
-  cp logs/_consolidated_log.csv ../$project.$nowformat/samples_metadata.csv
-fi #end classificationOnly
+    grep "Matching" "logs/_mapping.${marker_safe}.log" || true
+done
 
-##### create taxonomy
+#### MULTIMARKER: downstream per marker starts here
 
-  echo " "
-  echo "===================================="
-  echo "Taxonomic classification"
-  echo "===================================="
+echo "-- create output folder $project.$nowformat; add common files"
 
-threshold=$tax_threshold
+mkdir -p "../$project.$nowformat"
+cp config.txt "../$project.$nowformat/config.txt"
 
+mkdir -p "../$project.$nowformat/mixed"
+cp asvs.merge.fa "../$project.$nowformat/mixed/asvs.merge.fa"
+
+if [[ -f marker_assignment.tsv ]]; then
+    cp marker_assignment.tsv "../$project.$nowformat/mixed/marker_assignment.tsv"
+fi
+
+if [[ -d marker_split ]]; then
+    cp -r marker_split "../$project.$nowformat/mixed/"
+fi
+
+echo " "
+echo "===================================="
+echo "Marker-specific downstream processing"
+echo "===================================="
+
+threshold="$tax_threshold"
 echo "Classification threshold: $threshold"
 
-# switch here for marker
-rm taxonomy.vsearch
-if [ "$marker" = "fITS" ]
-  then
-    echo ",kingdom,phylum,class,order,family,genus,species" > taxonomy.vsearch
-    #echo ",kingdom,phylum,order,family,genus,species" > taxonomy.blast
-fi
+for marker_i in "${!marker_groups[@]}"; do
 
-if [ "$marker" = "fITS+16S" ]
-  then
-    echo ",kingdom,phylum,class,order,family,genus,species" > taxonomy.vsearch
-    #echo ",kingdom,phylum,order,family,genus,species" > taxonomy.blast
-fi
+    marker_name="${marker_groups[$marker_i]}"
+    marker_safe=$(echo "$marker_name" | sed 's/[^A-Za-z0-9_.-]/_/g')
 
-if [ "$marker" = "ITS2" ]
-  then
-    echo ",kingdom,phylum,order,family,genus,species" > taxonomy.vsearch
-    #echo ",kingdom,phylum,order,family,genus,species" > taxonomy.blast
-fi
+    echo " "
+    echo "===================================="
+    echo "Processing marker group: $marker_name"
+    echo "===================================="
 
-if [ "$marker" = "COI-5P" ]
-  then
-    echo ",kingdom,phylum,class,order,family,genus,species" > taxonomy.vsearch
-    #echo ",kingdom,phylum,class,order,family,subfamily,genus,species, subspecies" > taxonomy.blast
-fi
+    marker_outdir="../$project.$nowformat/$marker_safe"
+    mkdir -p "$marker_outdir"
 
-if [ "$marker" = "16S" ]
-  then
-    echo ",kingdom,phylum,order,family,genus" > taxonomy.vsearch
-    #echo ",kingdom,phylum,order,family,genus" > taxonomy.blast
-fi
+    asv_fasta_marker="asvs.${marker_safe}.fa"
+    asv_table_marker="asv_table.${marker_safe}.txt"
+    taxonomy_marker="taxonomy.${marker_safe}.vsearch"
 
-countdb=0
-cp  asvs.merge.fa asvs.direct.$countdb.uc.nohit.fasta
-prevDB=$countdb
+    if [[ ! -s "$asv_fasta_marker" ]]; then
+        echo "WARNING: no ASV FASTA for marker group $marker_name. Skipping downstream."
+        continue
+    fi
 
-for db in "${refDBs[@]}"
-  do :
-    countdb=$((countdb+1))
-    echo "-- Direct vsearch Classification level: $countdb";
-    echo "DB: $db";
-    $vsearch --usearch_global asvs.direct.$prevDB.uc.nohit.fasta \
-      --db $db \
-      --id 0.$threshold \
-      --uc asvs.direct.$countdb.uc \
-      --fastapairs asvs.direct.$countdb.fasta \
-      --strand both \
-      --threads $threads 2>  logs/_direct.$countdb.log
+    if [[ ! -s "$asv_table_marker" ]]; then
+        echo "WARNING: no ASV table for marker group $marker_name. Skipping downstream."
+        continue
+    fi
 
-    grep "^N[[:space:]]" asvs.direct.$countdb.uc | cut -f 9 > asvs.direct.$countdb.uc.nohit
-    total_xhits=$(wc -l asvs.direct.$countdb.uc | grep -o '[0-9]*' | head -n 1)
-    counted_hits=$(grep -c -v "^N[[:space:]]" asvs.direct.$countdb.uc )
-    counted_nohits=$(grep -c  "^N[[:space:]]" asvs.direct.$countdb.uc )
-    listed_nohits=$(wc -l asvs.direct.$countdb.uc.nohit | grep -o '[0-9]*' | head -n 1)
+    echo "-- prepare marker-specific output files"
 
-    echo "Total:                      $total_xhits, thereof $counted_hits hits and $counted_nohits no hits"
-    echo "Listed for next iteration:  $listed_nohits"
+    cp "$asv_fasta_marker" "$marker_outdir/asvs.merge.fa"
+    cp "$asv_table_marker" "$marker_outdir/asv_table.merge.txt"
 
-    python ../_resources/python/subset_fasta.py -i asvs.merge.fa \
-      -l asvs.direct.$countdb.uc.nohit \
-      -o asvs.direct.$countdb.uc.nohit.fasta
-    
-    #$seqfilter asvs.merge.fa --ids asvs.direct.$countdb.uc.nohit --out asvs.direct.$countdb.uc.nohit.fasta
-    filtered_nohits=$(grep -c  ">" asvs.direct.$countdb.uc.nohit.fasta)
-    echo "Filtered:                   $filtered_nohits"
+    # project.csv
+    echo "name;id;own;year;marker;description;participants;doi;repository;accession;ignore" > "$marker_outdir/project.csv"
+    echo "$project;$project;1;$nowformat;$marker_name;;;;;;" >> "$marker_outdir/project.csv"
 
-    cut -f 9,10 asvs.direct.$countdb.uc  | grep -v "*" | sed "s/[A-Za-z0-9_-]*;tax=//" >> taxonomy.vsearch
-    prevDB=$countdb
-  done
+    # samples.csv
+    echo "project;name;host;collectionDate;location;country;bioregion;latitude;longitude;tissue;treatment;sampletype;notes" > "$marker_outdir/samples.csv"
+    head -n 1 "$asv_table_marker" | \
+        sed -e "s/#OTU ID[[:space:]]//g" | \
+        tr "\t" "\n" | \
+        sed "s/^/$project;/" >> "$marker_outdir/samples.csv"
 
-echo "-- Hierarchical vsearch classification"
+    cp logs/_consolidated_log.csv "$marker_outdir/samples_metadata.csv"
 
-# hieDBs may be supplied either as a single scalar path:
-#   hieDBs="/path/to/db.fa"
-# or as an indexed array, analogous to refDBs:
-#   declare -a hieDBs
-#   hieDBs[1]="/path/to/db.level1.fa"
-#   hieDBs[2]="/path/to/db.level2.fa"
-hieDB_list=()
-if declare -p hieDBs 2>/dev/null | grep -q "declare \\-a"; then
-    for db in "${hieDBs[@]}"; do
-        if [[ -n "$db" ]]; then
-            hieDB_list+=("$db")
+    echo " "
+    echo "===================================="
+    echo "Taxonomic classification: $marker_name"
+    echo "===================================="
+
+    # taxonomy header from config if available, otherwise generic fallback
+    if [[ -n "${marker_tax_header[$marker_i]:-}" ]]; then
+        echo "${marker_tax_header[$marker_i]}" > "$taxonomy_marker"
+    else
+        echo ",kingdom,phylum,class,order,family,genus,species" > "$taxonomy_marker"
+    fi
+
+    countdb=0
+    cp "$asv_fasta_marker" "asvs.${marker_safe}.direct.$countdb.uc.nohit.fasta"
+    prevDB="$countdb"
+
+    # Direct classification cascade for this marker
+    db_i=0
+    for ref_i in "${!refDB_path[@]}"; do
+
+        if [[ "${refDB_marker[$ref_i]}" -ne "$marker_i" ]]; then
+            continue
         fi
+
+        db="${refDB_path[$ref_i]}"
+        countdb=$((countdb + 1))
+
+        echo "-- Direct vsearch classification marker=$marker_name level=$countdb"
+        echo "DB: $db"
+
+        "$vsearch" --usearch_global "asvs.${marker_safe}.direct.$prevDB.uc.nohit.fasta" \
+        --db "$db" \
+        --id "0.$threshold" \
+        --uc "asvs.${marker_safe}.direct.$countdb.uc" \
+        --fastapairs "asvs.${marker_safe}.direct.$countdb.fasta" \
+        --strand both \
+        --threads "$threads" \
+        2> "logs/_direct.${marker_safe}.$countdb.log"
+
+        grep "^N[[:space:]]" "asvs.${marker_safe}.direct.$countdb.uc" | \
+            cut -f 9 > "asvs.${marker_safe}.direct.$countdb.uc.nohit"
+
+        total_xhits=$(wc -l "asvs.${marker_safe}.direct.$countdb.uc" | grep -o '[0-9]*' | head -n 1)
+        counted_hits=$(grep -c -v "^N[[:space:]]" "asvs.${marker_safe}.direct.$countdb.uc")
+        counted_nohits=$(grep -c "^N[[:space:]]" "asvs.${marker_safe}.direct.$countdb.uc")
+        listed_nohits=$(wc -l "asvs.${marker_safe}.direct.$countdb.uc.nohit" | grep -o '[0-9]*' | head -n 1)
+
+        echo "Total:                      $total_xhits, thereof $counted_hits hits and $counted_nohits no hits"
+        echo "Listed for next iteration:  $listed_nohits"
+
+        python ../_resources/python/subset_fasta.py \
+        -i "$asv_fasta_marker" \
+        -l "asvs.${marker_safe}.direct.$countdb.uc.nohit" \
+        -o "asvs.${marker_safe}.direct.$countdb.uc.nohit.fasta"
+
+        filtered_nohits=$(grep -c ">" "asvs.${marker_safe}.direct.$countdb.uc.nohit.fasta")
+        echo "Filtered:                   $filtered_nohits"
+
+        cut -f 9,10 "asvs.${marker_safe}.direct.$countdb.uc" | \
+            grep -v "*" | \
+            sed "s/[A-Za-z0-9_-]*;tax=//" >> "$taxonomy_marker"
+
+        prevDB="$countdb"
+        db_i=$((db_i + 1))
     done
-else
-    if [[ -n "${hieDBs:-}" ]]; then
-        hieDB_list+=("$hieDBs")
-    fi
-fi
 
-if [[ "${#hieDB_list[@]}" -eq 0 ]]; then
-    echo "ERROR: no hierarchical reference database supplied via hieDBs"
-    exit 1
-fi
+    echo "-- Hierarchical vsearch classification marker=$marker_name"
 
-hier_input="asvs.direct.$countdb.uc.nohit.fasta"
-hier_count=0
+    hier_input="asvs.${marker_safe}.direct.$countdb.uc.nohit.fasta"
+    hier_count=0
 
-for hdb in "${hieDB_list[@]}"; do
-    hier_count=$((hier_count+1))
-    hier_prefix="asvs.hier.$hier_count"
+    hdb_i=0
+    hdb_i=0
 
-    if [[ ! -s "$hier_input" ]]; then
-        echo "No ASVs left for hierarchical classification. Stopping before level $hier_count."
-        break
-    fi
+    for hdb_index in "${!hieDB_path[@]}"; do
+        if [[ "${hieDB_marker[$hdb_index]}" -ne "$marker_i" ]]; then
+            continue
+        fi
+        hdb="${hieDB_path[$hdb_index]}"
+        hier_count=$((hier_count + 1))
+        hier_prefix="asvs.${marker_safe}.hier.$hier_count"
 
-    input_records=$(grep -c ">" "$hier_input")
-    echo "-- Hierarchical vsearch classification level: $hier_count"
-    echo "DB: $hdb"
-    echo "Input ASVs: $input_records"
+        if [[ ! -s "$hier_input" ]]; then
+            echo "No ASVs left for hierarchical classification. Stopping before level $hier_count."
+            break
+        fi
 
-    "$vsearch" --sintax "$hier_input" \
-      --db "$hdb" \
-      --tabbedout "$hier_prefix.sintax" \
-      --strand plus \
-      --sintax_cutoff "$sintax_cutoff" \
-      --threads "$threads" 2> "logs/_sintax.$hier_count.log"
+        input_records=$(grep -c ">" "$hier_input")
+        echo "-- Hierarchical vsearch classification marker=$marker_name level=$hier_count"
+        echo "DB: $hdb"
+        echo "Input ASVs: $input_records"
 
-    python ../_resources/python/sintax_overview.py "$hier_prefix.sintax"
+        "$vsearch" --sintax "$hier_input" \
+          --db "$hdb" \
+          --tabbedout "$hier_prefix.sintax" \
+          --strand plus \
+          --sintax_cutoff "$sintax_cutoff" \
+          --threads "$threads" \
+          2> "logs/_sintax.${marker_safe}.$hier_count.log"
 
-    classified_ids="$hier_prefix.classified.ids"
-    nohit_ids="$hier_prefix.nohit.ids"
-    nohit_fasta="$hier_prefix.nohit.fasta"
+        python ../_resources/python/sintax_overview.py "$hier_prefix.sintax"
 
-    if [ "${use_blast_sintax_combination:-0}" -eq 1 ]; then
-        echo "-- LCA BLAST classification level: $hier_count"
+        classified_ids="$hier_prefix.classified.ids"
+        nohit_ids="$hier_prefix.nohit.ids"
+        nohit_fasta="$hier_prefix.nohit.fasta"
 
-        hdb_prefix="${hdb%.*}"
+        if [ "${use_blast_sintax_combination:-0}" -eq 1 ]; then
+            echo "-- LCA BLAST classification marker=$marker_name level=$hier_count"
 
-        if [[ ! -f "${hdb_prefix}.ndb" ]]; then
-            echo "BLAST database not found. Creating with makeblastdb..."
+            hdb_prefix="${hdb%.*}"
 
-            if [[ ! -x "$makeblastdb" ]]; then
-                echo "ERROR: makeblastdb not found or not executable: $makeblastdb"
+            if [[ ! -f "${hdb_prefix}.ndb" ]]; then
+                echo "BLAST database not found. Creating with makeblastdb..."
+
+                if [[ ! -x "$makeblastdb" ]]; then
+                    echo "ERROR: makeblastdb not found or not executable: $makeblastdb"
+                    exit 1
+                fi
+
+                "$makeblastdb" -in "$hdb" -dbtype nucl -out "$hdb_prefix"
+            else
+                echo "BLAST database found. Skipping creation."
+            fi
+
+            if [[ ! -x "$blastn" ]]; then
+                echo "ERROR: blastn not found or not executable: $blastn"
                 exit 1
             fi
 
-            "$makeblastdb" -in "$hdb" -dbtype nucl -out "$hdb_prefix"
+            "$blastn" -query "$hier_input" -db "$hdb_prefix" \
+                -outfmt "6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore staxids" \
+                -max_target_seqs 50 \
+                -num_threads "$threads" \
+                -out "$hier_prefix.blast_output.tsv"
+
+            python ../_resources/python/infer_lca.py \
+                "$hier_prefix.blast_output.tsv" \
+                "$hier_prefix.blast_output.tsv.lca"
+
+            greedy=""
+            if [ "${use_blast_sintax_combination_greedy:-0}" -eq 1 ]; then
+                greedy="--greedy"
+            fi
+
+            python ../_resources/python/combine_taxonomy.py \
+                --blast "$hier_prefix.blast_output.tsv.lca" \
+                --sintax "$hier_prefix.sintax" \
+                --output "$hier_prefix.blast-lca_sintax.out" \
+                $greedy
+
+            awk -F '\t' 'NF >= 2 && $2 != "" && $2 != "*" {print $1}' \
+                "$hier_prefix.blast-lca_sintax.out" | sort -u > "$classified_ids"
+
+            if [[ -s "$classified_ids" ]]; then
+                awk -F '\t' 'NF >= 2 && $2 != "" && $2 != "*" {print $1 "\t" $2}' \
+                    "$hier_prefix.blast-lca_sintax.out" | \
+                    sed -E -e "s/_[0-9]+//g" -e "s/,s:.*$//" >> "$taxonomy_marker"
+            else
+                echo "WARNING: no classified IDs detected in $hier_prefix.blast-lca_sintax.out"
+                echo "         Falling back to SINTAX-only output for marker=$marker_name level=$hier_count."
+
+                cut -f1,4 "$hier_prefix.sintax" | \
+                    awk -F '\t' 'NF >= 2 && $2 != "" && $2 != "*" {print $0}' | \
+                    sed -E -e "s/_[0-9]+//g" -e "s/,s:.*$//" >> "$taxonomy_marker"
+
+                awk -F '\t' 'NF >= 4 && $4 != "" && $4 != "*" {print $1}' \
+                    "$hier_prefix.sintax" | sort -u > "$classified_ids"
+            fi
         else
-            echo "BLAST database found. Skipping creation."
-        fi
-
-        if [[ ! -x "$blastn" ]]; then
-            echo "ERROR: blastn not found or not executable: $blastn"
-            exit 1
-        fi
-
-        "$blastn" -query "$hier_input" -db "$hdb_prefix" \
-            -outfmt "6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore staxids" \
-            -max_target_seqs 50 \
-            -num_threads "$threads" \
-            -out "$hier_prefix.blast_output.tsv"
-
-        python ../_resources/python/infer_lca.py \
-            "$hier_prefix.blast_output.tsv" \
-            "$hier_prefix.blast_output.tsv.lca"
-
-        greedy=""
-        if [ "${use_blast_sintax_combination_greedy:-0}" -eq 1 ]; then
-            greedy="--greedy"
-        fi
-
-        python ../_resources/python/combine_taxonomy.py \
-            --blast "$hier_prefix.blast_output.tsv.lca" \
-            --sintax "$hier_prefix.sintax" \
-            --output "$hier_prefix.blast-lca_sintax.out" \
-            $greedy
-
-        awk -F '\t' 'NF >= 2 && $2 != "" && $2 != "*" {print $1}' \
-            "$hier_prefix.blast-lca_sintax.out" | sort -u > "$classified_ids"
-
-        if [[ -s "$classified_ids" ]]; then
-            awk -F '\t' 'NF >= 2 && $2 != "" && $2 != "*" {print $1 "\t" $2}' \
-                "$hier_prefix.blast-lca_sintax.out" | \
-                sed -E -e "s/_[0-9]+//g" -e "s/,s:.*$//" >> taxonomy.vsearch
-        else
-            echo "WARNING: no classified IDs detected in $hier_prefix.blast-lca_sintax.out"
-            echo "         Falling back to SINTAX-only output for hierarchical level $hier_count."
-
             cut -f1,4 "$hier_prefix.sintax" | \
                 awk -F '\t' 'NF >= 2 && $2 != "" && $2 != "*" {print $0}' | \
-                sed -E -e "s/_[0-9]+//g" -e "s/,s:.*$//" >> taxonomy.vsearch
+                sed -E -e "s/_[0-9]+//g" -e "s/,s:.*$//" >> "$taxonomy_marker"
 
             awk -F '\t' 'NF >= 4 && $4 != "" && $4 != "*" {print $1}' \
                 "$hier_prefix.sintax" | sort -u > "$classified_ids"
         fi
-    else
-        cut -f1,4 "$hier_prefix.sintax" | \
-            awk -F '\t' 'NF >= 2 && $2 != "" && $2 != "*" {print $0}' | \
-            sed -E -e "s/_[0-9]+//g" -e "s/,s:.*$//" >> taxonomy.vsearch
 
-        awk -F '\t' 'NF >= 4 && $4 != "" && $4 != "*" {print $1}' \
-            "$hier_prefix.sintax" | sort -u > "$classified_ids"
+        cut -f1 "$hier_prefix.sintax" | sort -u > "$hier_prefix.input.ids"
+        comm -23 "$hier_prefix.input.ids" "$classified_ids" > "$nohit_ids"
+
+        python ../_resources/python/subset_fasta.py \
+          -i "$hier_input" \
+          -l "$nohit_ids" \
+          -o "$nohit_fasta"
+
+        classified_count=$(wc -l < "$classified_ids" | tr -d ' ')
+        nohit_count=$(grep -c ">" "$nohit_fasta" 2>/dev/null || echo 0)
+
+        echo "Classified at hierarchical level $hier_count: $classified_count"
+        echo "Remaining for next level:                 $nohit_count"
+
+        hier_input="$nohit_fasta"
+        hdb_i=$((hdb_i + 1))
+    done
+
+    if [[ -s "$hier_input" ]]; then
+        cp "$hier_input" "asvs.${marker_safe}.hier.final.nohit.fasta"
     fi
 
-    # Build the input FASTA for the next hierarchical classifier from IDs that
-    # remain unclassified at this level.
-    cut -f1 "$hier_prefix.sintax" | sort -u > "$hier_prefix.input.ids"
-    comm -23 "$hier_prefix.input.ids" "$classified_ids" > "$nohit_ids"
+    echo "-- polishing and copying output files for marker group $marker_name"
 
-    python ../_resources/python/subset_fasta.py \
-      -i "$hier_input" \
-      -l "$nohit_ids" \
-      -o "$nohit_fasta"
+    cp "$taxonomy_marker" "${taxonomy_marker}.bak"
 
-    classified_count=$(wc -l < "$classified_ids" | tr -d ' ')
-    nohit_count=$(grep -c ">" "$nohit_fasta" 2>/dev/null || echo 0)
+    python3 ../_resources/python/fix_output_files.py \
+        --tax "$taxonomy_marker" \
+        --asv "$asv_table_marker"
 
-    echo "Classified at hierarchical level $hier_count: $classified_count"
-    echo "Remaining for next level:                 $nohit_count"
+    cp "$taxonomy_marker" "$marker_outdir/taxonomy.vsearch"
+    cp "$asv_table_marker" "$marker_outdir/asv_table.merge.txt"
 
-    hier_input="$nohit_fasta"
+    echo "-- create R script for marker group $marker_name"
+
+    cat ../_resources/R_template_header.R > "$marker_outdir/R_${project}.${marker_safe}.v0.R"
+    echo "# Created: $now" >> "$marker_outdir/R_${project}.${marker_safe}.v0.R"
+    echo "# Project: $project" >> "$marker_outdir/R_${project}.${marker_safe}.v0.R"
+    echo "# Marker: $marker_name" >> "$marker_outdir/R_${project}.${marker_safe}.v0.R"
+    echo "# For: $datasupplier" >> "$marker_outdir/R_${project}.${marker_safe}.v0.R"
+
+    cat ../_resources/R_template_libraries.R >> "$marker_outdir/R_${project}.${marker_safe}.v0.R"
+    echo "# Setting working directory (check path)" >> "$marker_outdir/R_${project}.${marker_safe}.v0.R"
+    echo "setwd('$(pwd)/$marker_outdir')" >> "$marker_outdir/R_${project}.${marker_safe}.v0.R"
+
+    echo "# Custom functions inclusion" >> "$marker_outdir/R_${project}.${marker_safe}.v0.R"
+    echo "marker=\"$marker_name\"" >> "$marker_outdir/R_${project}.${marker_safe}.v0.R"
+    echo "source('./metabarcoding_tools_0-1a.R')" >> "$marker_outdir/R_${project}.${marker_safe}.v0.R"
+
+    cat ../_resources/R_template_ITS2.R >> "$marker_outdir/R_${project}.${marker_safe}.v0.R"
+
+    cp ../_resources/metabarcoding_tools_0-1a.R "$marker_outdir/"
+    mkdir -p "$marker_outdir/plots"
+
+    if [ "${phylogeny:-0}" -eq 1 ]; then
+        echo "-- phylogeny for marker group $marker_name"
+
+        "$mafft" "$asv_fasta_marker" > "asvs.${marker_safe}.mafft.fa"
+        sed "s/;size/_size/g" "asvs.${marker_safe}.mafft.fa" > "asvs.${marker_safe}.mafft2.fa"
+
+        "$raxml" --msa "asvs.${marker_safe}.mafft2.fa" \
+            --model GTR+G \
+            --msa-format FASTA \
+            -threads "$threads" \
+            --prefix "asvs.${marker_safe}"
+
+        sed "s/;size/_size/g" "$taxonomy_marker" > "$marker_outdir/taxonomy.vsearch"
+        sed "s/;size/_size/g" "$asv_table_marker" > "$marker_outdir/asv_table.merge.txt"
+
+        cp "./asvs.${marker_safe}.raxml.bestTree" "$marker_outdir/asvs.tre" 2>/dev/null || true
+    fi
+
 done
+fi # end classificationOnly
 
-cp "$hier_input" asvs.hier.final.nohit.fasta
-
-
-# v3 idea [TODO]: phylo + spc estimation on sintax results
-
-echo "-- polishing and copying output files"
-
-cp taxonomy.vsearch taxonomy.vsearch.bak
-
-python3 ../_resources/python/fix_output_files.py --tax taxonomy.vsearch --asv asv.tab-csv
-cp taxonomy.vsearch ../$project.$nowformat/taxonomy.vsearch
-cp asv.tab-csv ../$project.$nowformat/asv_table.merge.txt
-
-echo "-- create R script"
-
-# CREATE R SCRIPT
-cat ../_resources/R_template_header.R > ../$project.$nowformat/R_$project.v0.R
-echo "# Created: $now" >>../$project.$nowformat/R_$project.v0.R
-echo "# Project: $project" >>../$project.$nowformat/R_$project.v0.R
-echo "# Marker: $marker" >>../$project.$nowformat/R_$project.v0.R
-echo "# For: $datasupplier" >>../$project.$nowformat/R_$project.v0.R
-
-cat ../_resources/R_template_libraries.R >> ../$project.$nowformat/R_$project.v0.R
-echo "# Setting working directory (check path)" >>../$project.$nowformat/R_$project.v0.R
-echo "setwd('$(pwd)/../$project.$nowformat')" >>../$project.$nowformat/R_$project.v0.R
-
-echo "# Custom functions inclusion" >>../$project.$nowformat/R_$project.v0.R
-echo "marker=\"$marker\"" >>../$project.$nowformat/R_$project.v0.R
-echo "source('./metabarcoding_tools_0-1a.R')" >>../$project.$nowformat/R_$project.v0.R
-
-cat ../_resources/R_template_ITS2.R >> ../$project.$nowformat/R_$project.v0.R
-
-cp ../_resources/metabarcoding_tools_0-1a.R ../$project.$nowformat/
-mkdir -p ../$project.$nowformat/plots
-
-if [ $phylogeny -eq 1 ]
-  then
-    $mafft asvs.merge.fa > asvs.merge.mafft.fa
-    sed "s/;size/_size/g" asvs.merge.mafft.fa > asvs.merge.mafft2.fa
-    $raxml --msa asvs.merge.mafft2.fa --model GTR+G --msa-format FASTA -threads $threads --prefix asvs
-    sed "s/;size/_size/g" ./taxonomy.vsearch > ../$project.$nowformat/taxonomy.vsearch
-    sed "s/;size/_size/g" asv.tab-csv > ../$project.$nowformat/asv_table.merge.txt
-    cp ./asvs.merge.mafft2.fa.raxml.bestTree ../$project.$nowformat/asvs.tre
-fi
+##### MULTIMARKER ENDS HERE
 
 $vsearch -v > logs/software.version
 cd ..

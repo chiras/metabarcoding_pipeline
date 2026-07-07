@@ -23,7 +23,7 @@ PRIMER_PRESETS = {
     "fITS+16S": {  # 16S: Kozich/EMP-style 515F + 806R; optional older 341F-like + 515R-like; ITS: fITS7 + ITS4/RITS4
         "fw": [
             "GTGARTCATCGAATCTTTG",    # fITS7
-            "GTGCCAGCMGCCGCGGTA",     # 515F, Maroschek sheet / V4
+            "GTGCCAGCMGCCGCGGTA",     # 515F,  V4
             "CCTACGGGAGGCAGCAG",      # 341F-like, older/alternative 16S setup
         ],
         "rv": [

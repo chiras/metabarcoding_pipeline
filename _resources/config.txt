@@ -1,53 +1,154 @@
-# Data information
-datasupplier=""
-marker="ITS2"
-level="species"
+#!/usr/bin/env bash
 
-# Reference Databases (direct, iterative)
-refDBs[0]="../_DBs/its2.Germany_niedersachsen_species.2020-05-11.tax.mc.add.fa"
-refDBs[1]="../_DBs/its2.global.2023-01-17.GBIF.Germany.tax.fa"
-refDBs[2]="../_DBs/its2.Europe.SwissProjectAllLocations.species.2020-07-01.tax.mc.fa"
-refDBs[3]="../_DBs/its2.global.2023-01-17.curated.tax.mc.add.fa"
+###############################################################################
+# Metabarcoding pipeline configuration
+# Project: XYZ
+# Processor: Alexander Keller / LMU
+###############################################################################
 
-# Reference Database (hierarchical)
-hieDBs="../_DBs/its2.global.2023-01-17.curated.tax.mc.add.fa"
+###############################################################################
+# Notes and optional preprocessing commands
+###############################################################################
 
-# Script parameters (0 = no, 1 = yes)
-threads=7               # how many cores to use
-use_fw_only=0           # in case of bad quality reverse reads, skip merging and proceed with fw only but quality truncated
-skip_preprocessing=0    # to continue after already done preprocessing, necessary files need to be present
-classificationOnly=0    # only reclassification, necessary files need to be present
-compressionCleanup=0    # compress large files at the end, as well as log, raw and tmp folders
-blastalternateclass=0   # have blast done with the same databases as an alternative classification method.
-                        # Beware, particularly the final webblast can take a long time and requires a stable internet connection
-phylogeny=0             # whether to do a phylogenetic tree of ASV for e.g. UniFrac
+NA
 
-# Processing parameters (default ITS2)
+###############################################################################
+# Project metadata
+###############################################################################
+
+datasupplier=""                       # project lead or data supplier
+dataprocessor=""                        # person processing the data
+collaborators=""                           # additional collaborators, if any
+
+
+###############################################################################
+# Reference databases
+###############################################################################
+mixed_marker_run=1
+
+declare -a marker_groups
+declare -a marker_tax_header
+declare -a refDB_marker
+declare -a refDB_path
+declare -a hieDB_marker
+declare -a hieDB_path
+
+#### Marker declarations
+marker_groups[0]="fITS"
+marker_tax_header[0]=",kingdom,phylum,class,order,family,genus,species"
+
+marker_groups[1]="16S"
+marker_tax_header[1]=",kingdom,phylum,order,family,genus"
+
+# Direct DBs as generic table:
+# refDB_marker[i] = marker index
+# refDB_path[i]   = database path
+
+refDB_marker[0]=0
+refDB_path[0]="../_DBs/ITS1-2_Fungi/2025/UNITE_public_19.02.2025.ut.fa"
+
+refDB_marker[1]=1
+refDB_path[1]="../_DBs/16S_Bacteria/2023UT/16S_rdp_16s_v18.ut.fa"
+
+refDB_marker[2]=1
+refDB_path[2]=../_DBs/16S_Bacteria/2023UT/16S_gg_16s_13.5.ut.fa"
+
+refDB_marker[3]=1
+refDB_path[3]="../_DBs/16S_Bacteria/2023UT/16S_silva_16s_v123.ut.fa"
+
+# Hierarchical DBs as generic table
+
+hieDB_marker[0]=0
+hieDB_path[0]="../_DBs/ITS1-2_Fungi/2025/UNITE_public_19.02.2025.ut.fa"
+
+hieDB_marker[1]=1
+hieDB_path[1]="../_DBs/16S_Bacteria/2023UT/16S_silva_16s_v123.ut.fa"
+
+###############################################################################
+# General pipeline switches
+# 0 = no, 1 = yes
+###############################################################################
+
+threads=7
+
+use_fw_only=0
+# 1 = skip merging and use forward reads only, useful when reverse reads are poor
+
+skip_preprocessing=1
+# 1 = continue after preprocessing; required intermediate files must already exist
+
+skip_primerremoval=0
+# 1 = skip primer removal; required primer-cleaned files must already exist
+
+classificationOnly=0
+# 1 = only repeat classification; required ASV/centroid files must already exist
+
+compress_intermediates=1
+# 1 = compress large intermediate files already during processing: longer runtime but less temporary disk space needed
+
+compressionCleanup=0
+# 1 = compress large files and selected log/raw/tmp folders at the end
+
+blastalternateclass=0
+# 1 = run BLAST with the same databases as an alternative classification method
+# Warning: final web BLAST can be slow and requires a stable internet connection
+
+phylogeny=0
+# 1 = calculate a phylogenetic ASV tree, for example for UniFrac
+
+
+###############################################################################
+# Marker and read-processing parameters
+###############################################################################
+
+marker="fITS+16S"
+level="genus"
+
+# Paired-end merging
 merge_minovlen=20
-merge_maxdiffs=10
-fastq_minlen=100        # for merging & filtering
-fastq_minlen2=200       # for truncation & filtering
-fastq_maxlen=400
+merge_maxdiffs=99
+mergeoptions="--fastq_allowmergestagger"
+
+# Read-length and quality filters
+fastq_minlen=150
+fastq_minlen2=150
+fastq_maxlen=600
 fastq_maxns=0
 fastq_maxee=1
 fastq_truncee=1.5
-stripleft=0             # in case of adapters
-stripright=0            # in case of adapters
-unoisealpha=2           # default 2
-cutend_fw=200           # number of bases to keep
-cutend_rv=175           # number of bases to keep
-mergeoptions=""         # if you need to pass other parameters to merge
-postcluster=97          # leave 0 for no postclustering of ASVs, otherwise percent identity in integer
 
-# classification
-tax_threshold=97 # perc identity threshold for classification
+# Optional fixed trimming after merging/filtering, e.g. adapters
+stripleft=19
+stripright=20
+
+# End trimming before merging
+cutend_fw=230
+cutend_rv=230
+
+# Primer removal, including variable heterogeneity spacers / staggered bases
+max_5p_prefix_stagger=10
+max_3p_suffix_stagger=10
+
+# ASV denoising / clustering
+derep_chunk_threshold=50000000
+derep_chunk_records=50000000
+unoisealpha=2
+postcluster=98
+# Set postcluster=0 to disable ASV postclustering.
+# Otherwise, value is percent identity as integer, e.g. 97.
+
+# Taxonomic classification
+marker_assignment_min_delta=2
+tax_threshold=97
 sintax_cutoff=0.9
-use_blast_sintax_combination=1            # Allows to make additional blast to generate a hierarchical classification by LCA of 50 (filtered by cov and pid)
-use_blast_sintax_combination_greedy=1     # 1 use a greedy combination of SINTAX / BLAST-LCA, or 0 be more conservative in those confirmed by both
+use_blast_sintax_combination=0
+# Requires BLAST to be installed and available via blastn/makeblastdb below.
 
-# Paths to binaries
-seqfilter=PATH/TO/BINARY/OF/SeqFilter
-vsearch=PATH/TO/BINARY/OF/vsearch
-mafft="PATH/TO/BINARY/OF/mafft"     # only if phylogeny=1
-raxml="PATH/TO/BINARY/OF/raxml-ng"  # only if phylogeny=1  
-blast="PATH/TO/BINARY/OF/blastn"    # only if use_blast_sintax_combination=1  
+###############################################################################
+# Paths to binaries and helper scripts
+###############################################################################
+
+vsearch="/opt/homebrew/bin/vsearch"
+blastn="/opt/homebrew/bin/blastn"
+makeblastdb="/opt/homebrew/bin/makeblastdb"
+
