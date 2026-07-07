@@ -461,13 +461,13 @@ echo "Classification threshold: $threshold"
 rm taxonomy.vsearch
 if [ "$marker" = "fITS" ]
   then
-    echo ",kingdom,phylum,order,family,genus,species" > taxonomy.vsearch
+    echo ",kingdom,phylum,class,order,family,genus,species" > taxonomy.vsearch
     #echo ",kingdom,phylum,order,family,genus,species" > taxonomy.blast
 fi
 
 if [ "$marker" = "fITS+16S" ]
   then
-    echo ",kingdom,phylum,order,family,genus,species" > taxonomy.vsearch
+    echo ",kingdom,phylum,class,order,family,genus,species" > taxonomy.vsearch
     #echo ",kingdom,phylum,order,family,genus,species" > taxonomy.blast
 fi
 
@@ -527,63 +527,153 @@ for db in "${refDBs[@]}"
     prevDB=$countdb
   done
 
-echo "-- Hierarchical vsearch classification";
-echo "DB: $hieDBs";
+echo "-- Hierarchical vsearch classification"
 
-$vsearch --sintax asvs.direct.$countdb.uc.nohit.fasta \
-  --db $hieDBs \
-  --tabbedout asvs.uc.merge.nohit.sintax \
-  --strand plus \
-  --sintax_cutoff $sintax_cutoff \
-  --threads $threads 2>  logs/_sintax.log
+# hieDBs may be supplied either as a single scalar path:
+#   hieDBs="/path/to/db.fa"
+# or as an indexed array, analogous to refDBs:
+#   declare -a hieDBs
+#   hieDBs[1]="/path/to/db.level1.fa"
+#   hieDBs[2]="/path/to/db.level2.fa"
+hieDB_list=()
+if declare -p hieDBs 2>/dev/null | grep -q "declare \\-a"; then
+    for db in "${hieDBs[@]}"; do
+        if [[ -n "$db" ]]; then
+            hieDB_list+=("$db")
+        fi
+    done
+else
+    if [[ -n "${hieDBs:-}" ]]; then
+        hieDB_list+=("$hieDBs")
+    fi
+fi
 
-python ../_resources/python/sintax_overview.py asvs.uc.merge.nohit.sintax
+if [[ "${#hieDB_list[@]}" -eq 0 ]]; then
+    echo "ERROR: no hierarchical reference database supplied via hieDBs"
+    exit 1
+fi
 
-if [ "$use_blast_sintax_combination" -eq 1 ]; then
-    echo "-- LCA BLAST classification"
+hier_input="asvs.direct.$countdb.uc.nohit.fasta"
+hier_count=0
 
-    hieDB_prefix="${hieDBs%.*}"
+for hdb in "${hieDB_list[@]}"; do
+    hier_count=$((hier_count+1))
+    hier_prefix="asvs.hier.$hier_count"
 
-    if [[ ! -f "${hieDB_prefix}.ndb" ]]; then
-        echo "BLAST database not found. Creating with makeblastdb..."
+    if [[ ! -s "$hier_input" ]]; then
+        echo "No ASVs left for hierarchical classification. Stopping before level $hier_count."
+        break
+    fi
 
-        if [[ ! -x "$makeblastdb" ]]; then
-            echo "ERROR: makeblastdb not found or not executable: $makeblastdb"
+    input_records=$(grep -c ">" "$hier_input")
+    echo "-- Hierarchical vsearch classification level: $hier_count"
+    echo "DB: $hdb"
+    echo "Input ASVs: $input_records"
+
+    "$vsearch" --sintax "$hier_input" \
+      --db "$hdb" \
+      --tabbedout "$hier_prefix.sintax" \
+      --strand plus \
+      --sintax_cutoff "$sintax_cutoff" \
+      --threads "$threads" 2> "logs/_sintax.$hier_count.log"
+
+    python ../_resources/python/sintax_overview.py "$hier_prefix.sintax"
+
+    classified_ids="$hier_prefix.classified.ids"
+    nohit_ids="$hier_prefix.nohit.ids"
+    nohit_fasta="$hier_prefix.nohit.fasta"
+
+    if [ "${use_blast_sintax_combination:-0}" -eq 1 ]; then
+        echo "-- LCA BLAST classification level: $hier_count"
+
+        hdb_prefix="${hdb%.*}"
+
+        if [[ ! -f "${hdb_prefix}.ndb" ]]; then
+            echo "BLAST database not found. Creating with makeblastdb..."
+
+            if [[ ! -x "$makeblastdb" ]]; then
+                echo "ERROR: makeblastdb not found or not executable: $makeblastdb"
+                exit 1
+            fi
+
+            "$makeblastdb" -in "$hdb" -dbtype nucl -out "$hdb_prefix"
+        else
+            echo "BLAST database found. Skipping creation."
+        fi
+
+        if [[ ! -x "$blastn" ]]; then
+            echo "ERROR: blastn not found or not executable: $blastn"
             exit 1
         fi
 
-        "$makeblastdb" -in "$hieDBs" -dbtype nucl -out "$hieDB_prefix"
+        "$blastn" -query "$hier_input" -db "$hdb_prefix" \
+            -outfmt "6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore staxids" \
+            -max_target_seqs 50 \
+            -num_threads "$threads" \
+            -out "$hier_prefix.blast_output.tsv"
+
+        python ../_resources/python/infer_lca.py \
+            "$hier_prefix.blast_output.tsv" \
+            "$hier_prefix.blast_output.tsv.lca"
+
+        greedy=""
+        if [ "${use_blast_sintax_combination_greedy:-0}" -eq 1 ]; then
+            greedy="--greedy"
+        fi
+
+        python ../_resources/python/combine_taxonomy.py \
+            --blast "$hier_prefix.blast_output.tsv.lca" \
+            --sintax "$hier_prefix.sintax" \
+            --output "$hier_prefix.blast-lca_sintax.out" \
+            $greedy
+
+        awk -F '\t' 'NF >= 2 && $2 != "" && $2 != "*" {print $1}' \
+            "$hier_prefix.blast-lca_sintax.out" | sort -u > "$classified_ids"
+
+        if [[ -s "$classified_ids" ]]; then
+            awk -F '\t' 'NF >= 2 && $2 != "" && $2 != "*" {print $1 "\t" $2}' \
+                "$hier_prefix.blast-lca_sintax.out" | \
+                sed -E -e "s/_[0-9]+//g" -e "s/,s:.*$//" >> taxonomy.vsearch
+        else
+            echo "WARNING: no classified IDs detected in $hier_prefix.blast-lca_sintax.out"
+            echo "         Falling back to SINTAX-only output for hierarchical level $hier_count."
+
+            cut -f1,4 "$hier_prefix.sintax" | \
+                awk -F '\t' 'NF >= 2 && $2 != "" && $2 != "*" {print $0}' | \
+                sed -E -e "s/_[0-9]+//g" -e "s/,s:.*$//" >> taxonomy.vsearch
+
+            awk -F '\t' 'NF >= 4 && $4 != "" && $4 != "*" {print $1}' \
+                "$hier_prefix.sintax" | sort -u > "$classified_ids"
+        fi
     else
-        echo "BLAST database found. Skipping creation."
+        cut -f1,4 "$hier_prefix.sintax" | \
+            awk -F '\t' 'NF >= 2 && $2 != "" && $2 != "*" {print $0}' | \
+            sed -E -e "s/_[0-9]+//g" -e "s/,s:.*$//" >> taxonomy.vsearch
+
+        awk -F '\t' 'NF >= 4 && $4 != "" && $4 != "*" {print $1}' \
+            "$hier_prefix.sintax" | sort -u > "$classified_ids"
     fi
 
-    if [[ ! -x "$blastn" ]]; then
-        echo "ERROR: blastn not found or not executable: $blastn"
-        exit 1
-    fi
+    # Build the input FASTA for the next hierarchical classifier from IDs that
+    # remain unclassified at this level.
+    cut -f1 "$hier_prefix.sintax" | sort -u > "$hier_prefix.input.ids"
+    comm -23 "$hier_prefix.input.ids" "$classified_ids" > "$nohit_ids"
 
-    "$blastn" -query "asvs.direct.$countdb.uc.nohit.fasta" -db "$hieDB_prefix" \
-        -outfmt "6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore staxids" \
-        -max_target_seqs 50 \
-        -num_threads "$threads" \
-        -out asvs.blast_output.tsv
+    python ../_resources/python/subset_fasta.py \
+      -i "$hier_input" \
+      -l "$nohit_ids" \
+      -o "$nohit_fasta"
 
-    python ../_resources/python/infer_lca.py asvs.blast_output.tsv asvs.blast_output.tsv.lca
+    classified_count=$(wc -l < "$classified_ids" | tr -d ' ')
+    nohit_count=$(grep -c ">" "$nohit_fasta" 2>/dev/null || echo 0)
 
-    greedy=""
-    if [ "$use_blast_sintax_combination_greedy" -eq 1 ]; then
-        greedy="--greedy"
-    fi
+    echo "Classified at hierarchical level $hier_count: $classified_count"
+    echo "Remaining for next level:                 $nohit_count"
 
-    python ../_resources/python/combine_taxonomy.py \
-        --blast asvs.blast_output.tsv.lca \
-        --sintax asvs.uc.merge.nohit.sintax \
-        --output asvs.blast-lca_sintax.out \
-        $greedy
-else
-    cut -f1,4 asvs.uc.merge.nohit.sintax | \
-        sed -E -e "s/_[0-9]+//g" -e "s/,s:.*$//" >> taxonomy.vsearch
-fi
+    hier_input="$nohit_fasta"
+done
+
+cp "$hier_input" asvs.hier.final.nohit.fasta
 
 
 # v3 idea [TODO]: phylo + spc estimation on sintax results
