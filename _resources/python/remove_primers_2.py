@@ -16,6 +16,22 @@ PRIMER_PRESETS = {
         "fw": ["ATGCGATACTTGGTGTGAAT"],
         "rv": ["TCCTCCGCTTATTGATATGC"],
     },
+    "fITS": { # FITS7 + RITS4
+        "fw": ["GTGARTCATCGAATCTTTG"],
+        "rv": ["TCCTCCGCTTATTGATATGC"],
+    },
+    "fITS+16S": {  # 16S: Kozich/EMP-style 515F + 806R; optional older 341F-like + 515R-like; ITS: fITS7 + ITS4/RITS4
+        "fw": [
+            "GTGARTCATCGAATCTTTG",    # fITS7
+            "GTGCCAGCMGCCGCGGTA",     # 515F, Maroschek sheet / V4
+            "CCTACGGGAGGCAGCAG",      # 341F-like, older/alternative 16S setup
+        ],
+        "rv": [
+            "TCCTCCGCTTATTGATATGC",   # ITS4 / RITS4
+            "GGACTACHVGGGTWTCTAAT",   # 806R
+            "GTGCCAGCMGCCGCGGTAA",    # 515R-like, older/alternative 16S setup
+        ],
+    },
     "COI": {
         "fw": ["GGWACWGGWTGAACWGTWTAYCCYCC"],
         "rv": [
@@ -30,11 +46,18 @@ PRIMER_PRESETS = {
             "TAAACTTCAGGGTGACCAAARAAYCA",
         ],
     },
-    "16S": {
-        "fw": ["CCTACGGGAGGCAGCAG"],
-        "rv": ["GTGCCAGCMGCCGCGGTAA"],
-    },
+    "16S": {  # accepted 16S primer variants: 341F/515R-like and 515F/806R V4
+        "fw": [
+            "CCTACGGGAGGCAGCAG",      # 341F-like
+            "GTGCCAGCMGCCGCGGTA"      # 515F, as in Maroschek sheet
+        ],
+        "rv": [
+            "GTGCCAGCMGCCGCGGTAA",    # 515R-like / reverse primer in older setup
+            "GGACTACHVGGGTWTCTAAT"    # 806R
+        ],
+    }
 }
+
 
 
 def parse_args():
