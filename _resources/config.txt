@@ -51,7 +51,7 @@ refDB_marker[1]=1
 refDB_path[1]="../_DBs/16S_Bacteria/2023UT/16S_rdp_16s_v18.ut.fa"
 
 refDB_marker[2]=1
-refDB_path[2]=../_DBs/16S_Bacteria/2023UT/16S_gg_16s_13.5.ut.fa"
+refDB_path[2]="../_DBs/16S_Bacteria/2023UT/16S_gg_16s_13.5.ut.fa"
 
 refDB_marker[3]=1
 refDB_path[3]="../_DBs/16S_Bacteria/2023UT/16S_silva_16s_v123.ut.fa"
