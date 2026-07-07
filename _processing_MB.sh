@@ -239,9 +239,18 @@ fi #end skip preprocessing
 
 #     # cleanup
     echo "-- cleanup"
-    mv *.fastq raw/
-    mv *.fq tmp/
-    mv *.fa tmp/
+
+    for f in *.fastq; do
+        [[ -e "$f" ]] && mv "$f" raw/
+    done
+
+    for f in *.fq; do
+        [[ -e "$f" ]] && mv "$f" tmp/
+    done
+
+    for f in *.fa; do
+        [[ -e "$f" ]] && mv "$f" tmp/
+    done
 
   echo "-- removing primer sequences"
   if [ $skip_primerremoval -ne 1 ] 
