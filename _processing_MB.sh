@@ -238,187 +238,187 @@ fi #end skip preprocessing
 
 
 #     # cleanup
-#     echo "-- cleanup"
-#     mv *.fastq raw/
-#     mv *.fq tmp/
-#     mv *.fa tmp/
+    echo "-- cleanup"
+    mv *.fastq raw/
+    mv *.fq tmp/
+    mv *.fa tmp/
 
-#   echo "-- removing primer sequences"
-#   if [ $skip_primerremoval -ne 1 ] 
-#     then
-#       python ../_resources/python/remove_primers_2.py \
-#         --input all.merge.fasta \
-#         --output all.merge.fasta.noprimer.fasta \
-#         --marker "$marker" \
-#         --max-5p-prefix-stagger "$max_5p_prefix_stagger" \
-#         --max-3p-suffix-stagger "$max_3p_suffix_stagger"
-#   else
-#     echo "Skipping primer removal because skip_primerremoval == 1"
-#     #cp all.merge.fasta all.merge.fasta.noprimer.fasta
-#   fi
+  echo "-- removing primer sequences"
+  if [ $skip_primerremoval -ne 1 ] 
+    then
+      python ../_resources/python/remove_primers_2.py \
+        --input all.merge.fasta \
+        --output all.merge.fasta.noprimer.fasta \
+        --marker "$marker" \
+        --max-5p-prefix-stagger "$max_5p_prefix_stagger" \
+        --max-3p-suffix-stagger "$max_3p_suffix_stagger"
+  else
+    echo "Skipping primer removal because skip_primerremoval == 1"
+    #cp all.merge.fasta all.merge.fasta.noprimer.fasta
+  fi
 
-#   echo " "
-#   echo "===================================="
-#   echo "ASV generation and mapping"
-#   echo "===================================="
+  echo " "
+  echo "===================================="
+  echo "ASV generation and mapping"
+  echo "===================================="
 
-#   echo "-- derep"
+  echo "-- derep"
 
-#   derep_input="all.merge.fasta.noprimer.fasta"
-#   derep_output="all.merge.derep.fa"
-#   derep_uc="all.merge.derep.uc"
+  derep_input="all.merge.fasta.noprimer.fasta"
+  derep_output="all.merge.derep.fa"
+  derep_uc="all.merge.derep.uc"
 
-#   # Number of FASTA records above which chunked dereplication is used
-#   # 2-line FASTA is assumed because primer removal writes fasta_width 0
-#   derep_chunk_threshold="${derep_chunk_threshold:-50000000}"
+  # Number of FASTA records above which chunked dereplication is used
+  # 2-line FASTA is assumed because primer removal writes fasta_width 0
+  derep_chunk_threshold="${derep_chunk_threshold:-50000000}"
 
-#   # Number of FASTA records per chunk
-#   derep_chunk_records="${derep_chunk_records:-10000000}"
+  # Number of FASTA records per chunk
+  derep_chunk_records="${derep_chunk_records:-10000000}"
 
-#   derep_records=$(grep -c "^>" "$derep_input")
+  derep_records=$(grep -c "^>" "$derep_input")
 
-#   echo "Dereplication input records: $derep_records"
+  echo "Dereplication input records: $derep_records"
 
-#   if [[ "$derep_records" -gt "$derep_chunk_threshold" ]]; then
-#       echo "Large input detected. Using chunked dereplication."
+  if [[ "$derep_records" -gt "$derep_chunk_threshold" ]]; then
+      echo "Large input detected. Using chunked dereplication."
 
-#       mkdir -p tmp/derep_chunks tmp/derep_out logs/derep_chunks
+      mkdir -p tmp/derep_chunks tmp/derep_out logs/derep_chunks
 
-#       rm -f tmp/derep_chunks/chunk_* tmp/derep_out/*.derep.fa all.merge.derep.stage1.fa
+      rm -f tmp/derep_chunks/chunk_* tmp/derep_out/*.derep.fa all.merge.derep.stage1.fa
 
-#       # FASTA-aware split by record count.
-#       # This is safe for both wrapped and unwrapped FASTA.
-#       awk -v records_per_file="$derep_chunk_records" \
-#           -v outdir="tmp/derep_chunks" '
-#           BEGIN {
-#               file_index = 0
-#               record_count = 0
-#           }
-#           /^>/ {
-#               if (record_count % records_per_file == 0) {
-#                   if (out) close(out)
-#                   file_index++
-#                   out = sprintf("%s/chunk_%05d.fa", outdir, file_index)
-#               }
-#               record_count++
-#           }
-#           {
-#               print > out
-#           }
-#       ' "$derep_input"
+      # FASTA-aware split by record count.
+      # This is safe for both wrapped and unwrapped FASTA.
+      awk -v records_per_file="$derep_chunk_records" \
+          -v outdir="tmp/derep_chunks" '
+          BEGIN {
+              file_index = 0
+              record_count = 0
+          }
+          /^>/ {
+              if (record_count % records_per_file == 0) {
+                  if (out) close(out)
+                  file_index++
+                  out = sprintf("%s/chunk_%05d.fa", outdir, file_index)
+              }
+              record_count++
+          }
+          {
+              print > out
+          }
+      ' "$derep_input"
 
-#       total_chunks=$(find tmp/derep_chunks -type f -name "chunk_*.fa" | wc -l | tr -d ' ')
-#       chunk_i=0
+      total_chunks=$(find tmp/derep_chunks -type f -name "chunk_*.fa" | wc -l | tr -d ' ')
+      chunk_i=0
 
-#       echo "Created $total_chunks dereplication chunks."
+      echo "Created $total_chunks dereplication chunks."
 
-#       if [[ "$total_chunks" -eq 0 ]]; then
-#           echo "ERROR: splitting produced no chunks."
-#           exit 1
-#       fi
+      if [[ "$total_chunks" -eq 0 ]]; then
+          echo "ERROR: splitting produced no chunks."
+          exit 1
+      fi
 
-#       for chunk in tmp/derep_chunks/chunk_*.fa; do
-#           chunk_i=$((chunk_i + 1))
-#           base=$(basename "$chunk" .fa)
+      for chunk in tmp/derep_chunks/chunk_*.fa; do
+          chunk_i=$((chunk_i + 1))
+          base=$(basename "$chunk" .fa)
 
-#           echo "-- Chunk dereplication $chunk_i / $total_chunks: $base"
+          echo "-- Chunk dereplication $chunk_i / $total_chunks: $base"
 
-#           "$vsearch" --derep_fulllength "$chunk" \
-#             --minuniquesize 1 \
-#             --sizein \
-#             --sizeout \
-#             --fasta_width 0 \
-#             --output "tmp/derep_out/${base}.derep.fa" \
-#             2> "logs/derep_chunks/${base}.log"
+          "$vsearch" --derep_fulllength "$chunk" \
+            --minuniquesize 1 \
+            --sizein \
+            --sizeout \
+            --fasta_width 0 \
+            --output "tmp/derep_out/${base}.derep.fa" \
+            2> "logs/derep_chunks/${base}.log"
 
-#           if [[ $? -ne 0 || ! -s "tmp/derep_out/${base}.derep.fa" ]]; then
-#               echo "ERROR: chunk dereplication failed for $chunk"
-#               echo "Check logs/derep_chunks/${base}.log"
-#               exit 1
-#           fi
-#       done
+          if [[ $? -ne 0 || ! -s "tmp/derep_out/${base}.derep.fa" ]]; then
+              echo "ERROR: chunk dereplication failed for $chunk"
+              echo "Check logs/derep_chunks/${base}.log"
+              exit 1
+          fi
+      done
 
 
-#       echo "-- Concatenating chunk-level dereplicated files"
-#       cat tmp/derep_out/*.derep.fa > all.merge.derep.stage1.fa
-#       $gzip_cmd tmp/derep_chunks/chunk_*.fa
-#       $gzip_cmd tmp/derep_out/*.derep.fa
+      echo "-- Concatenating chunk-level dereplicated files"
+      cat tmp/derep_out/*.derep.fa > all.merge.derep.stage1.fa
+      $gzip_cmd tmp/derep_chunks/chunk_*.fa
+      $gzip_cmd tmp/derep_out/*.derep.fa
 
-#       echo "-- Final global dereplication after chunking"
+      echo "-- Final global dereplication after chunking"
 
-#       "$vsearch" --derep_fulllength all.merge.derep.stage1.fa \
-#         --minuniquesize 2 \
-#         --sizein \
-#         --sizeout \
-#         --fasta_width 0 \
-#         --uc "$derep_uc" \
-#         --output "$derep_output" \
-#         2> logs/_derep.log
-#       $gzip_cmd all.merge.derep.stage1.fa
+      "$vsearch" --derep_fulllength all.merge.derep.stage1.fa \
+        --minuniquesize 2 \
+        --sizein \
+        --sizeout \
+        --fasta_width 0 \
+        --uc "$derep_uc" \
+        --output "$derep_output" \
+        2> logs/_derep.log
+      $gzip_cmd all.merge.derep.stage1.fa
 
-#   else
-#       echo "Input below chunk threshold. Using standard dereplication."
+  else
+      echo "Input below chunk threshold. Using standard dereplication."
 
-#       "$vsearch" --derep_fulllength "$derep_input" \
-#         --minuniquesize 2 \
-#         --sizein \
-#         --sizeout \
-#         --fasta_width 0 \
-#         --uc "$derep_uc" \
-#         --output "$derep_output" \
-#         2> logs/_derep.log
-#   fi
+      "$vsearch" --derep_fulllength "$derep_input" \
+        --minuniquesize 2 \
+        --sizein \
+        --sizeout \
+        --fasta_width 0 \
+        --uc "$derep_uc" \
+        --output "$derep_output" \
+        2> logs/_derep.log
+  fi
 
-#   if [[ $? -ne 0 || ! -s "$derep_output" ]]; then
-#       echo "ERROR: dereplication failed. Check logs/_derep.log"
-#       exit 1
-#   fi
+  if [[ $? -ne 0 || ! -s "$derep_output" ]]; then
+      echo "ERROR: dereplication failed. Check logs/_derep.log"
+      exit 1
+  fi
 
-#   echo "-- denoise"
-#   $vsearch --cluster_unoise  all.merge.derep.fa \
-#     --sizein --sizeout \
-#     --relabel ASV \
-#     --unoise_alpha $unoisealpha \
-#     --centroids asvs.merge_chim.fa \
-#     --threads $threads 2> logs/_unoise.log
+  echo "-- denoise"
+  $vsearch --cluster_unoise  all.merge.derep.fa \
+    --sizein --sizeout \
+    --relabel ASV \
+    --unoise_alpha $unoisealpha \
+    --centroids asvs.merge_chim.fa \
+    --threads $threads 2> logs/_unoise.log
 
-#   grep "Clusters" logs/_unoise.log
-#   grep "Singletons" logs/_unoise.log
+  grep "Clusters" logs/_unoise.log
+  grep "Singletons" logs/_unoise.log
 
-#   echo "-- sorting"
-#   $vsearch --sortbysize asvs.merge_chim.fa \
-#     --output asvs.merge_sorted.fa \
-#     --threads $threads 2>  logs/_sort.log
+  echo "-- sorting"
+  $vsearch --sortbysize asvs.merge_chim.fa \
+    --output asvs.merge_sorted.fa \
+    --threads $threads 2>  logs/_sort.log
 
-#   echo "-- chimera removal"
-#   $vsearch --uchime3_denovo asvs.merge_sorted.fa \
-#     --abskew 16 \
-#     --nonchimeras asvs.merge.fa \
-#     --threads $threads 2>  logs/_uchime.log
+  echo "-- chimera removal"
+  $vsearch --uchime3_denovo asvs.merge_sorted.fa \
+    --abskew 16 \
+    --nonchimeras asvs.merge.fa \
+    --threads $threads 2>  logs/_uchime.log
 
-#   grep "Found" logs/_uchime.log
+  grep "Found" logs/_uchime.log
 
-#   if [[ $postcluster -gt 0 ]]; then
-#     mv asvs.merge.fa asvs.merge.tmp.fa
-#     echo "-- postclustering of ASVs at $postcluster% identity"
-#     $vsearch --cluster_fast asvs.merge.tmp.fa \
-#               --uc asvs.postcluster.uc \
-#               --centroids asvs.merge.fa  \
-#               --sizein --sizeout --sizeorder \
-#               --threads $threads \
-#               --id 0.$postcluster 2>  logs/_postcluster.log
-#     clusterin=$(grep -c ">" asvs.merge.tmp.fa)
-#     clusterout=$(grep -c ">" asvs.merge.fa)
-#     echo "$clusterin ASVs post-clustered to $clusterout pASVs"
-#   fi
+  if [[ $postcluster -gt 0 ]]; then
+    mv asvs.merge.fa asvs.merge.tmp.fa
+    echo "-- postclustering of ASVs at $postcluster% identity"
+    $vsearch --cluster_fast asvs.merge.tmp.fa \
+              --uc asvs.postcluster.uc \
+              --centroids asvs.merge.fa  \
+              --sizein --sizeout --sizeorder \
+              --threads $threads \
+              --id 0.$postcluster 2>  logs/_postcluster.log
+    clusterin=$(grep -c ">" asvs.merge.tmp.fa)
+    clusterout=$(grep -c ">" asvs.merge.fa)
+    echo "$clusterin ASVs post-clustered to $clusterout pASVs"
+  fi
 
-#   ### create community table
-#   echo "-- add barcodelabel"
-#   #cat all.merge.fasta.noprimer.fa |  sed "s/^>R1+2-\(.*\)\_\([0-9]*\);/>R1+2-\1_\2;barcodelabel=\1;/g" |  sed "s/^>R1-\([a-zA-Z0-9-]*\)\_\([0-9]*\)/>R1-\1_\2;barcodelabel=\1;/g" > all.merge.bc.fasta
-#   python ../_resources/python/add_barcodelabel.py -i all.merge.fasta.noprimer.fasta -o all.merge.bc.fasta
+  ### create community table
+  echo "-- add barcodelabel"
+  python ../_resources/python/add_barcodelabel.py -i all.merge.fasta.noprimer.fasta -o all.merge.bc.fasta
 
-#  echo "-- map data against ASVs"
-#  $vsearch --usearch_global all.merge.bc.fasta --db asvs.merge.fa --strand plus --id 0.97 --uc map.merge.uc --otutabout asv.tab-csv --sizeout --threads $threads 2> logs/_mapping.log
+ echo "-- map data against ASVs"
+ $vsearch --usearch_global all.merge.bc.fasta --db asvs.merge.fa --strand plus --id 0.97 --uc map.merge.uc --otutabout asv.tab-csv --sizeout --threads $threads 2> logs/_mapping.log
+
 
   grep "Matching" logs/_mapping.log
 
@@ -447,11 +447,6 @@ fi #end classificationOnly
   echo "===================================="
   echo "Taxonomic classification"
   echo "===================================="
-
-# $vsearch
-# old script version: keep to troubleshoot
-# refDBs=($(grep "refdb" config.txt | cut -f2 -d"=" | sed 's/\"//g'))
-# hieDBs=($(grep "hiedb" config.txt | cut -f2 -d"=" | sed 's/\"//g'))
 
 threshold=$tax_threshold
 
