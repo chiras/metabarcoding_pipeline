@@ -206,9 +206,8 @@ for f in *_R1_*.fastq; do
             "$s.mergefiltered.fa" \
             "$s.trunc.fa"
         do
-            if [[ -f "$tmpfile" && "$tmpfile" != "$selected_file" ]]; then
+            if [[ -f "$tmpfile" ]]; then
 
-                # Compress if not already compressed
                 if [[ ! -f "$tmpfile.gz" ]]; then
                     $gzip_cmd "$tmpfile"
                     tmpfile="$tmpfile.gz"
@@ -216,7 +215,6 @@ for f in *_R1_*.fastq; do
                     tmpfile="$tmpfile.gz"
                 fi
 
-                # Move compressed intermediate to tmp folder
                 if [[ -f "$tmpfile" ]]; then
                     mv "$tmpfile" "../tmp/preprocessing/"
                 fi
