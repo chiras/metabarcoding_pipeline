@@ -1,3 +1,215 @@
+drop_empty_taxa_samples <- function(ps, verbose = TRUE, context = "empty filtering") {
+  if (!inherits(ps, "phyloseq")) {
+    stop("Input must be a phyloseq object.")
+  }
+
+  if (ntaxa(ps) == 0) {
+    stop("Phyloseq object has zero taxa.")
+  }
+
+  if (nsamples(ps) == 0) {
+    stop("Phyloseq object has zero samples.")
+  }
+
+  n_taxa_before <- ntaxa(ps)
+  n_samples_before <- nsamples(ps)
+
+  empty_taxa <- taxa_sums(ps) == 0
+  n_empty_taxa <- sum(empty_taxa)
+
+  ps <- prune_taxa(!empty_taxa, ps)
+
+  if (ntaxa(ps) == 0) {
+    stop("All taxa have zero abundance after pruning.")
+  }
+
+  empty_samples <- sample_sums(ps) == 0
+  n_empty_samples <- sum(empty_samples)
+
+  ps <- prune_samples(!empty_samples, ps)
+
+  if (nsamples(ps) == 0) {
+    stop("All samples have zero abundance after pruning.")
+  }
+
+  if (verbose) {
+    message(
+      context, ": removed ",
+      n_empty_taxa, " empty taxa and ",
+      n_empty_samples, " empty samples."
+    )
+  }
+
+  return(list(
+    phyloseq = ps,
+    n_taxa_before = n_taxa_before,
+    n_taxa_after = ntaxa(ps),
+    n_samples_before = n_samples_before,
+    n_samples_after = nsamples(ps),
+    n_empty_taxa_removed = n_empty_taxa,
+    n_empty_samples_removed = n_empty_samples
+  ))
+}
+filter_low_abundance <- function(ps_counts, threshold = 0.01, min_samples = 1, verbose = TRUE) {
+
+  empty_pre <- drop_empty_taxa_samples(
+    ps_counts,
+    verbose = verbose,
+    context = "Before low-abundance filtering"
+  )
+
+  ps_counts <- empty_pre$phyloseq
+
+  ps_rel <- transform_sample_counts(ps_counts, function(x) {
+    total <- sum(x, na.rm = TRUE)
+    if (total == 0) {
+      x
+    } else {
+      x / total
+    }
+  })
+
+  otu_rel <- as(otu_table(ps_rel), "matrix")
+  otu_counts <- as(otu_table(ps_counts), "matrix")
+
+  taxa_rows <- taxa_are_rows(ps_counts)
+
+  if (taxa_are_rows(ps_rel) != taxa_rows) {
+    stop("Count and relative-abundance objects have different OTU-table orientation.")
+  }
+
+  if (!taxa_rows) {
+    otu_rel <- t(otu_rel)
+    otu_counts <- t(otu_counts)
+  }
+
+  n_taxa_before_low <- nrow(otu_counts)
+  n_samples_before_low <- ncol(otu_counts)
+
+  keep_cell <- otu_rel >= threshold
+  keep_taxa <- rowSums(keep_cell, na.rm = TRUE) >= min_samples
+
+  n_taxa_removed_low_abundance <- sum(!keep_taxa)
+
+  if (sum(keep_taxa) == 0) {
+    stop(
+      paste0(
+        "Filtering would remove all taxa. ",
+        "No taxon reaches threshold = ", threshold,
+        " in at least ", min_samples, " sample(s). ",
+        "Taxa removed by low abundance: ", n_taxa_removed_low_abundance, "."
+      )
+    )
+  }
+
+  otu_rel_filtered <- otu_rel[keep_taxa, , drop = FALSE]
+  otu_counts_filtered <- otu_counts[keep_taxa, , drop = FALSE]
+
+  low_cell <- otu_rel_filtered < threshold
+
+  otu_rel_filtered[low_cell] <- 0
+  otu_counts_filtered[low_cell] <- 0
+
+  keep_samples <- colSums(otu_counts_filtered, na.rm = TRUE) > 0
+
+  n_samples_removed_low_abundance <- sum(!keep_samples)
+
+  if (sum(keep_samples) == 0) {
+    stop(
+      paste0(
+        "Filtering would remove all samples. ",
+        "Samples removed by low abundance: ", n_samples_removed_low_abundance, "."
+      )
+    )
+  }
+
+  otu_rel_filtered <- otu_rel_filtered[, keep_samples, drop = FALSE]
+  otu_counts_filtered <- otu_counts_filtered[, keep_samples, drop = FALSE]
+
+  keep_taxa_after <- rowSums(otu_counts_filtered, na.rm = TRUE) > 0
+
+  n_taxa_removed_empty_after_low <- sum(!keep_taxa_after)
+
+  if (sum(keep_taxa_after) == 0) {
+    stop(
+      paste0(
+        "Filtering would remove all taxa after empty-sample pruning. ",
+        "Additional empty taxa after low-abundance filtering: ",
+        n_taxa_removed_empty_after_low, "."
+      )
+    )
+  }
+
+  otu_rel_filtered <- otu_rel_filtered[keep_taxa_after, , drop = FALSE]
+  otu_counts_filtered <- otu_counts_filtered[keep_taxa_after, , drop = FALSE]
+
+  kept_taxa_names <- rownames(otu_counts)[keep_taxa][keep_taxa_after]
+  kept_sample_names <- colnames(otu_counts)[keep_samples]
+
+  if (!taxa_rows) {
+    otu_rel_filtered <- t(otu_rel_filtered)
+    otu_counts_filtered <- t(otu_counts_filtered)
+  }
+
+  ps_counts_filtered <- prune_taxa(kept_taxa_names, ps_counts)
+  ps_counts_filtered <- prune_samples(kept_sample_names, ps_counts_filtered)
+
+  ps_rel_filtered <- prune_taxa(kept_taxa_names, ps_rel)
+  ps_rel_filtered <- prune_samples(kept_sample_names, ps_rel_filtered)
+
+  otu_table(ps_counts_filtered) <- otu_table(
+    otu_counts_filtered,
+    taxa_are_rows = taxa_rows
+  )
+
+  otu_table(ps_rel_filtered) <- otu_table(
+    otu_rel_filtered,
+    taxa_are_rows = taxa_rows
+  )
+
+  if (verbose) {
+    message(
+      "Low-abundance filtering: removed ",
+      n_taxa_removed_low_abundance,
+      " taxa by threshold and ",
+      n_samples_removed_low_abundance,
+      " samples that became empty."
+    )
+
+    message(
+      "After low-abundance filtering: removed ",
+      n_taxa_removed_empty_after_low,
+      " additional empty taxa."
+    )
+
+    message(
+      "Final object: ",
+      ntaxa(ps_counts_filtered), " taxa and ",
+      nsamples(ps_counts_filtered), " samples retained."
+    )
+  }
+
+  return(list(
+    counts = ps_counts_filtered,
+    relative = ps_rel_filtered,
+
+    n_taxa_before = empty_pre$n_taxa_before,
+    n_taxa_after = ntaxa(ps_counts_filtered),
+    n_samples_before = empty_pre$n_samples_before,
+    n_samples_after = nsamples(ps_counts_filtered),
+
+    n_empty_taxa_removed_before = empty_pre$n_empty_taxa_removed,
+    n_empty_samples_removed_before = empty_pre$n_empty_samples_removed,
+
+    n_taxa_removed_low_abundance = n_taxa_removed_low_abundance,
+    n_samples_removed_low_abundance = n_samples_removed_low_abundance,
+    n_empty_taxa_removed_after_low_abundance = n_taxa_removed_empty_after_low,
+
+    threshold = threshold,
+    min_samples = min_samples
+  ))
+}
+
 ### pseudo fill metadata
 fill_pseudo_metadata <- function(phyloseq){
   if (sum(!is.na(sample_data(phyloseq)$location)) == 0){

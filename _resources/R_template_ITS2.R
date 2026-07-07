@@ -56,8 +56,11 @@ taxa_names(data.species) <- tax_table(data.species)[,"species"]
 (data.species <- label_low_throughput(data.species , 500))
 sample_names(data.species)
 
-# Transform to relative data
-data.species.rel = transform_sample_counts(data.species, function(x) x/sum(x))
+# Transform to relative data and filter low abundance
+filtered <- filter_low_abundance(data.species, threshold = 0.01)
+
+data.species.filter <- filtered$counts
+data.species.rel.filter <- filtered$relative
 
 ## (optional) consider looking at controls and
 control_samples = c("negative","positive")
@@ -91,15 +94,6 @@ ggplot(controls.melt.rel, aes(x=species, y=Abundance, col=Type))+geom_boxplot()+
            label = "0.0001", hjust = 1, vjust = -0.5, color = "red")+  
   theme(axis.text.x=element_text(angle = -90, hjust = 0))
 dev.off()
-
-data.species <- subset_samples(data.species, !(Type %in% control_samples))
-data.species.rel <- subset_samples(data.species.rel, !(Type %in% control_samples))
-
-# low abundance filtering
-otu_table(data.species.rel)[otu_table(data.species.rel)<0.01 ]<-0
-otu_table(data.species)[otu_table(data.species.rel)<0.01 ]<-0
-data.species.filter		= prune_taxa(taxa_sums(data.species)>0, data.species)
-(data.species.rel.filter = prune_taxa(rowSums(otu_table(data.species.rel))>0, data.species.rel))
 
 # define paramters for plot definitions
 ntaxa <- length(taxa_names(data.species.rel.filter))
