@@ -8,15 +8,6 @@ A simple script to process metabarcoding (e.g. 16S V4) data, with amplicons gene
 
 If you use this script, please kindly cite this article: https://doi.org/10.1098/rstb.2021.0171
 
-# Dependencies
-* VSEARCH https://github.com/torognes/vsearch
-* Also check the _DBs folder for Databases
-* if using LCA option, then BLASTn: https://www.ncbi.nlm.nih.gov/books/NBK569861/ or over HomeBrew ```brew install blast```
-
-## not anymore needed, just for legacy reasons: 
-* SeqFilter https://github.com/BioInf-Wuerzburg/SeqFilter
-* (USEARCH python scripts depreciated and work around is now integrated https://drive5.com/python/ )
-
 # What will the script do?
 
 * Un-gzipping files
@@ -34,24 +25,352 @@ If you use this script, please kindly cite this article: https://doi.org/10.1098
     - all unclassified reads are hierarchically classified
   * Creation of a community table
 
-# Usage:
-1) Put all your raw sequencing files (```.fastq``` or ```.fastq.gz```) into a subfolder of where this script is (do not use full paths).
-2) Copy a config.txt from the resources folder, adapt it to your needs, and copy it into your data folder. Consier to check paths to binaries in the script file
 
-5) You also need to add a ```config.txt``` file, where information about databases are stored. An example is in the example directory.
+## Quick start
 
-Then you are ready to run:
+1. Put all raw sequencing files (`*.fastq`, `*.fq`, or gzipped equivalents) into a project folder located next to the pipeline script.
+
+2. Copy and adapt a `config.txt` into the project folder. At minimum, check:
+   - project metadata
+   - marker settings
+   - reference database paths
+   - binary paths for `vsearch`, `blastn`, and `makeblastdb`
+   - read-processing parameters such as `cutend_fw`, `cutend_rv`, `stripleft`, `stripright`, and primer-removal settings
+
+3. Run:
+
 ```sh
-bash _processing_MB_0.2a.sh <FOLDER>
+bash _processing_MB.sh <FOLDER>
 ```
 
-Results will be in a new subfolder of your current directory called ```<FOLDER>.<DATE>```
+Results are written to:
 
-In case the analysis needs to be reverted, which will remove files and bring the folder structure back to the original state.
+```text
+<FOLDER>.<DATE>/
+```
+
+For example:
+
+```text
+ITS2_Test2021_BG.21-07-07/
+```
+
+To revert an analysis and restore the folder structure:
 
 ```sh
 bash _revert_analysis_1.sh <FOLDER>
 ```
 
-# Import into R
-In the ```<FOLDER>.<DATE>``` folder, there will be an R script for data import and basic ecological analyses.
+## Minimal dependency check
+
+Before running on a new machine, check:
+
+```sh
+vsearch --version
+python3 - <<'PY'
+import Bio
+import tqdm
+print("Python dependencies OK")
+PY
+```
+
+If Python dependencies are missing:
+
+```sh
+pip install biopython tqdm
+```
+
+or with conda:
+
+```sh
+conda install -c conda-forge biopython tqdm
+```
+## Main workflow
+
+The script performs:
+
+- optional decompression of raw files
+- per-sample preprocessing
+  - forward/reverse trimming
+  - paired-end merging
+  - quality filtering
+  - fallback to forward-only reads when merged reads are insufficient
+- primer removal with support for heterogeneity spacers / staggered primer positions
+- dereplication
+  - standard dereplication for smaller datasets
+  - chunked dereplication for large datasets
+- denoising with `vsearch --cluster_unoise`
+- de novo chimera removal
+- optional ASV postclustering
+- ASV-to-marker assignment for mixed-marker runs
+- marker-specific ASV FASTA generation
+- marker-specific read mapping and ASV tables
+- direct and hierarchical taxonomic classification
+- output folder generation with R import scripts and metadata templates
+
+### Mixed-marker runs
+
+Mixed-marker mode is enabled with:
+
+```sh
+mixed_marker_run=1
+```
+
+Marker groups are declared with indexed bash arrays, which are compatible with older macOS bash versions:
+
+```sh
+declare -a marker_groups
+declare -a marker_tax_header
+declare -a refDB_marker
+declare -a refDB_path
+declare -a hieDB_marker
+declare -a hieDB_path
+
+marker_groups[0]="fITS"
+marker_tax_header[0]=",kingdom,phylum,class,order,family,genus,species"
+
+marker_groups[1]="16S"
+marker_tax_header[1]=",kingdom,phylum,order,family,genus"
+```
+
+Reference databases are linked to marker indices:
+
+```sh
+refDB_marker[0]=0
+refDB_path[0]="../_DBs/ITS1-2_Fungi/2025/UNITE_public_19.02.2025.ut.fa"
+
+refDB_marker[1]=1
+refDB_path[1]="../_DBs/16S_Bacteria/2023UT/16S_rdp_16s_v18.ut.fa"
+```
+
+Hierarchical databases use the same logic:
+
+```sh
+hieDB_marker[0]=0
+hieDB_path[0]="../_DBs/ITS1-2_Fungi/2025/UNITE_public_19.02.2025.ut.fa"
+
+hieDB_marker[1]=1
+hieDB_path[1]="../_DBs/16S_Bacteria/2023UT/16S_silva_16s_v123.ut.fa"
+```
+
+The pipeline assigns final ASVs to marker groups using marker-specific reference databases and writes:
+
+```text
+marker_split/
+  marker_assignment.tsv
+  <marker>.ids
+  ambiguous.ids
+  unassigned.ids
+```
+
+It then creates marker-specific outputs such as:
+
+```text
+<FOLDER>.<DATE>/fITS/
+<FOLDER>.<DATE>/16S/
+<FOLDER>.<DATE>/mixed/
+```
+
+### Unassigned and ambiguous ASVs
+
+In mixed-marker mode, ASVs that cannot be confidently assigned to a marker group are written to:
+
+```text
+marker_split/unassigned.ids
+marker_split/ambiguous.ids
+```
+
+These are not necessarily artefacts. They can include off-target amplicons, mitochondrial/chloroplast sequences, primer-derived off-targets, or sequences absent from the configured marker databases.
+
+A useful diagnostic is to create a separate FASTA and abundance table for unassigned ASVs:
+
+```sh
+python ../_resources/python/subset_fasta.py   -i asvs.merge.fa   -l marker_split/unassigned.ids   -o asvs.unassigned.fa   --exact_match
+```
+
+### Primer removal with stagger support
+
+Primer removal supports variable heterogeneity spacers / staggered bases:
+
+```sh
+max_5p_prefix_stagger=10
+max_3p_suffix_stagger=10
+```
+
+The script reports how many sequences were trimmed at the start, end, either end, or not trimmed. This is useful to diagnose whether primers were already removed by the sequencing provider or whether only partial primer remnants remain.
+
+For mixed-marker runs, include all expected primer variants in the primer-removal script/configuration. Avoid fixed `stripleft`/`stripright` trimming before primer removal unless this is intentional, because fixed trimming can remove only part of a primer and prevent full-primer detection later.
+
+### Chunked dereplication
+
+For large datasets, the pipeline can split dereplication into chunks:
+
+```sh
+derep_chunk_threshold=5000000
+derep_chunk_records=5000000
+```
+
+Suggested values depend on machine RAM and sequence complexity:
+
+```text
+32 GB RAM: 2M-5M records per chunk
+64 GB RAM: 5M-20M records per chunk, depending on complexity
+```
+
+Large chunks are faster but can fail if the number of unique full-length sequences is very high. Smaller chunks are slower but safer.
+
+### Intermediate compression
+
+Intermediate files can be compressed and moved during preprocessing:
+
+```sh
+compress_intermediates=1
+```
+
+If `pigz` is available, the pipeline uses it for faster parallel compression. Otherwise it falls back to `gzip`.
+
+## Dependencies
+
+### Required
+
+- Bash
+- VSEARCH: https://github.com/torognes/vsearch
+- Python 3
+- Python packages:
+  - `biopython`
+  - `tqdm`
+
+Install Python packages with:
+
+```sh
+pip install biopython tqdm
+```
+
+or:
+
+```sh
+conda install -c conda-forge biopython tqdm
+```
+
+### Required for typical downstream output
+
+- R
+- R packages used by the generated import/analysis templates, depending on the template version
+
+### Optional
+
+- BLAST+ / `blastn` and `makeblastdb`, required if LCA or BLAST/SINTAX combination is enabled
+  - macOS Homebrew: `brew install blast`
+  - Conda: `conda install -c bioconda blast`
+- `pigz`, optional parallel gzip compression
+  - macOS Homebrew: `brew install pigz`
+  - Ubuntu: `sudo apt install pigz`
+- MAFFT and RAxML/RAxML-NG, only if phylogenetic tree generation is enabled
+- Reference databases in `_DBs/`, for example UNITE, SILVA, RDP, Greengenes, or marker-specific curated databases
+
+### Legacy / deprecated
+
+- SeqFilter is no longer required for the current workflow.
+- Older USEARCH helper scripts are no longer required for normal operation.
+
+## Important configuration notes
+
+### Single-marker mode
+
+For a standard single-marker run, keep:
+
+```sh
+mixed_marker_run=0
+marker="ITS2"
+```
+
+and use the legacy single-marker database settings if your script version still supports them.
+
+### Mixed-marker mode
+
+For mixed-marker runs:
+
+```sh
+mixed_marker_run=1
+marker="fITS+16S"
+```
+
+Use `marker_groups`, `refDB_marker/refDB_path`, and `hieDB_marker/hieDB_path`.
+
+### Primer and trimming parameters
+
+For primer-aware trimming, prefer:
+
+```sh
+stripleft=0
+stripright=0
+```
+
+and let the primer-removal step remove primers and staggered primer positions.
+
+Use fixed `stripleft`/`stripright` only when you intentionally want to remove a fixed number of bases independent of primer detection.
+
+### Skipping steps
+
+If skipping preprocessing:
+
+```sh
+skip_preprocessing=1
+```
+
+the required intermediate files must already exist.
+
+If skipping primer removal:
+
+```sh
+skip_primerremoval=1
+```
+
+the script should either copy:
+
+```text
+all.merge.fasta -> all.merge.fasta.noprimer.fasta
+```
+
+or the latter file must already exist. Otherwise dereplication will fail because the expected input file is missing.
+
+### Classification only
+
+If repeating only classification:
+
+```sh
+classificationOnly=1
+```
+
+the required ASV FASTA files, ASV tables, marker assignment files, and intermediate taxonomy files must already be present.
+
+## Output structure
+
+A mixed-marker run creates a structure similar to:
+
+```text
+<FOLDER>.<DATE>/
+  config.txt
+  mixed/
+    asvs.merge.fa
+    marker_assignment.tsv
+    marker_split/
+  fITS/
+    asvs.merge.fa
+    asv_table.merge.txt
+    taxonomy.vsearch
+    samples.csv
+    samples_metadata.csv
+    project.csv
+    R_<project>.fITS.v0.R
+  16S/
+    asvs.merge.fa
+    asv_table.merge.txt
+    taxonomy.vsearch
+    samples.csv
+    samples_metadata.csv
+    project.csv
+    R_<project>.16S.v0.R
+```
+
+Single-marker runs create the corresponding single marker output.
