@@ -258,7 +258,11 @@ fi #end skip preprocessing
         --output all.merge.fasta.noprimer.fasta \
         --marker "$marker" \
         --max-5p-prefix-stagger "$max_5p_prefix_stagger" \
-        --max-3p-suffix-stagger "$max_3p_suffix_stagger"
+        --max-3p-suffix-stagger "$max_3p_suffix_stagger" \
+        --max-primer-mismatches 0 \
+        --threads "$threads" \
+        --batch-size 5000
+        
   else
     echo "Skipping primer removal because skip_primerremoval == 1"
     #cp all.merge.fasta all.merge.fasta.noprimer.fasta
