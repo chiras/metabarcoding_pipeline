@@ -261,8 +261,8 @@ fi #end skip preprocessing
         --max-3p-suffix-stagger "$max_3p_suffix_stagger" \
         --max-primer-mismatches 0 \
         --threads "$threads" \
-        --batch-size 5000
-        
+        --batch-size 10000
+
   else
     echo "Skipping primer removal because skip_primerremoval == 1"
     #cp all.merge.fasta all.merge.fasta.noprimer.fasta
@@ -428,16 +428,23 @@ python ../_resources/python/add_barcodelabel.py \
   -i all.merge.fasta.noprimer.fasta \
   -o all.merge.bc.fasta
 
+fi # end classificationOnly
+
 if [[ "${mixed_marker_run:-0}" -eq 1 && "${#marker_groups[@]}" -gt 1 ]]; then
     echo "-- assign ASVs to marker groups"
+    marker_assignment_threshold=90
 
     python ../_resources/python/assign_asv_marker_groups.py \
-      --asv-fasta asvs.merge.fa \
-      --config config.txt \
-      --vsearch "$vsearch" --min-delta "${marker_assignment_min_delta:-2}" \
-      --threshold "$tax_threshold" \
-      --threads "$threads" \
-      --outdir marker_split
+    --asv-fasta asvs.merge.fa \
+    --config config.txt \
+    --vsearch "$vsearch" \
+    --min-delta "${marker_assignment_min_delta:-2}" \
+    --threshold "${marker_assignment_threshold:-90}" \
+    --threads "$threads" \
+    --db-source hieDB \
+    --strand both \
+    --vsearch-extra "--qmask none --dbmask none --maxaccepts 1 --maxrejects 32" \
+    --outdir marker_split
 
     echo "-- split ASV FASTA by marker group"
 
@@ -812,7 +819,6 @@ for marker_i in "${!marker_groups[@]}"; do
     fi
 
 done
-fi # end classificationOnly
 
 ##### MULTIMARKER ENDS HERE
 
