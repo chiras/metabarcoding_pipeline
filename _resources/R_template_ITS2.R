@@ -9,7 +9,7 @@ data.otu <- otu_table(read.table("asv_table.merge.txt"), taxa_are_rows=T)
 # data.tre <- read.tree("asvs.tre")
 
 ## Sample metadata (second line optional if sample names include "-"):
-data.map <- 	sample_data(read.table("samples_metadata.csv", header=T, row.names=1,  sep=";", fill=T))
+data.map <- 	sample_data(read.table("samples_metadata.csv", header=T, row.names=1,  sep=",", fill=T))
 sample_names(data.map) <- gsub("-",".",sample_names(data.map))
 
 ## check metadata vs. samples in sequencing data consistency
@@ -18,12 +18,12 @@ sample_names(data.otu)[!(sample_names(data.otu) %in% sample_names(data.map))]
 
 ## merge the three tables to a single phyloseq object
 (data.comp <- merge_phyloseq(data.otu,data.tax,data.map))
+
 ## if phylogeny included: 
 # (data.comp <- merge_phyloseq(data.otu,data.tax,data.map,data.tre))
 
-
-# create fake metadata if needed
-data.comp <- fill_pseudo_metadata(data.comp)
+## create fake metadata if needed
+# data.comp <- fill_pseudo_metadata(data.comp)
 
 # preprocessing data pt.1 :
 ## given hierarchical classification options at the end, we have to propagate the taxonomy over taxonomic levels to not throw out stuff only classified to higher tax levels
@@ -55,6 +55,9 @@ taxa_names(data.species) <- tax_table(data.species)[,"species"]
 ## (optional) Label samples with low throughput with LT
 (data.species <- label_low_throughput(data.species , 500))
 sample_names(data.species)
+
+# Filtering taxa that are not relevant 
+data.species <- subset_taxa(data.species, !species %in% c("Microcycas calocoma","Ephedra major","Impatiens acuminata"))
 
 # Transform to relative data and filter low abundance
 filtered <- filter_low_abundance(data.species, threshold = 0.01)
@@ -98,39 +101,6 @@ dev.off()
 # define paramters for plot definitions
 ntaxa <- length(taxa_names(data.species.rel.filter))
 
-
-
-# # check GBIF location records
-# species_records_long <- get_species_occurences_long(data.species.rel.filter, notInGBIF=T)
-
-# species_records_long$regCountry <- (interaction(species_records_long$region,species_records_long$sub.region))
-# species_records_long <- species_records_long[order(species_records_long$region),]
-# species_records_long$regCountry <- factor(species_records_long$regCountry, levels = unique(sort(as.character(species_records_long$regCountry))))
-
-# species_records_long <- cbind(species_records_long,tax_table(data.species.rel.filter)[species_records_long$Species,])
-
-# species_records_long$SpecAbund <- interaction(species_records_long$Species,sprintf("%.3f", round(species_records_long$Abundance, digits=4)), sep=" | ")
-
-# pdf("plots/species_occurence.pdf", width=15, height=ntaxa/5)
-
-# ggplot(species_records_long, aes(fill=regCountry, y=value, x=SpecAbund, alpha=log(Abundance*1000,10))) + 
-#   facet_grid(order+family~region, space = "free", scales = "free",switch = "y")+
-#   geom_bar(position="stack", stat="identity")+
-#   theme(strip.text.y.left = element_text(angle = 0))+
-#   theme(axis.text.x = element_text(angle = 60, hjust = 1),axis.title.x = element_text(family = "sans", size = 15)) + 
-#   xlab("Species | cumulative relative Abundance")+
-#   ylab("GBIF record abundance (log)")+
-#   theme(legend.position="bottom")+
-#   coord_flip()+ 
-#   scale_y_continuous(trans=scales::pseudo_log_trans(base = 10), 
-#                      breaks = scales::trans_breaks("log10", function(x) 10^x), 
-#                      labels = scales::trans_format("log10", scales::math_format(10^.x))
-#   )#+ annotation_logticks(sides = "b", )  
-# dev.off()
-
-
-# Filtering taxa that are not relevant 
-data.species.rel.filter <- subset_taxa(data.species.rel.filter, !species %in% c("Microcycas calocoma","Ephedra major","Impatiens acuminata"))
 
 
 # First diversity and community metrics and graphs
