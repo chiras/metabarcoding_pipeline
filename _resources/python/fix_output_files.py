@@ -28,7 +28,7 @@ def clean_taxon_name(value):
 
 def parse_taxonomy_string(tax_string):
     """
-    Convert a semicolon-separated taxonomy string into fixed-rank columns.
+    Convert a comma- or semicolon-separated taxonomy string into fixed-rank columns.
 
     Expected rank prefixes:
     d: or k: kingdom/domain
@@ -52,9 +52,14 @@ def parse_taxonomy_string(tax_string):
 
     tax_string = tax_string.strip()
     tax_string = re.sub(r";size=\d+", "", tax_string)
-    tax_string = tax_string.rstrip(";")
+    tax_string = tax_string.rstrip(";,")
 
-    parts = [p.strip() for p in tax_string.split(";") if p.strip()]
+    # VSEARCH taxonomy may use either commas or semicolons as rank separators.
+    parts = [
+        p.strip()
+        for p in re.split(r"[;,]", tax_string)
+        if p.strip()
+    ]
 
     for part in parts:
         part = clean_taxon_name(part)
@@ -79,7 +84,7 @@ def parse_taxonomy_string(tax_string):
 
 def convert_vsearch_taxonomy_to_csv(infile, outfile):
     """
-    Convert vsearch taxonomy output to a clean comma-separated table.
+    Convert VSEARCH taxonomy output to a clean comma-separated table.
 
     Output columns:
     ASV, kingdom, phylum, class, order, family, genus, species
@@ -108,25 +113,29 @@ def convert_vsearch_taxonomy_to_csv(infile, outfile):
             if not line:
                 continue
 
-            # vsearch output is often tab-separated:
-            # ASV123<TAB>d:Bacteria;p:...
+            # Skip existing taxonomy header.
+            if line.startswith(",kingdom,") or line.startswith("ASV,kingdom,"):
+                continue
+
+            # Standard VSEARCH output:
+            # ASV123;size=100<TAB>k:Viridiplantae,p:...,s:...
             if "\t" in line:
                 asv_id, tax_string = line.split("\t", 1)
 
-            # Sometimes after previous processing it may be comma-separated:
-            # ASV123,d:Bacteria;p:...
+            # Also support already comma-separated input:
+            # ASV123,k:Viridiplantae,p:...,s:...
             elif "," in line:
                 asv_id, tax_string = line.split(",", 1)
 
             else:
-                # No usable taxonomy separator
                 continue
 
             asv_id = clean_taxon_name(asv_id)
             tax_string = tax_string.strip()
 
-            # Remove possible leading junk before taxonomy starts
-            tax_string = re.sub(r"^.*?(?=(d:|k:))", "", tax_string)
+            # Ignore malformed/non-taxonomy lines.
+            if not re.search(r"(^|[,;])(d:|k:)", tax_string):
+                continue
 
             ranks = parse_taxonomy_string(tax_string)
 
@@ -134,7 +143,6 @@ def convert_vsearch_taxonomy_to_csv(infile, outfile):
                 "ASV": asv_id,
                 **ranks
             })
-
 
 def main():
     parser = argparse.ArgumentParser(description="Clean ASV and taxonomy files.")
