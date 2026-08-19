@@ -9,8 +9,11 @@
 ###################################################################
 
 
-githash=$(git log -1 --pretty=format:%h)
-gitversion=$(git log --pretty=format:%h | wc -l)
+#githash=$(git log -1 --pretty=format:%h)
+#gitversion=$(git log --pretty=format:%h | wc -l)
+githash=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+gitversion=$(git rev-list --count HEAD 2>/dev/null || echo "unknown")
+
 set -o pipefail
 
 if [ -z "$1" ]; then
@@ -770,35 +773,92 @@ for marker_i in "${!marker_groups[@]}"; do
 
     echo "-- polishing and copying output files for marker group $marker_name"
 
-    cp "$taxonomy_marker" "${taxonomy_marker}.bak"
+    mv "$taxonomy_marker" "${taxonomy_marker}.bak"
 
     python3 ../_resources/python/fix_output_files.py \
-        --tax "$taxonomy_marker" \
+        --tax "${taxonomy_marker}.bak" \
+        --tax-out "$taxonomy_marker" \
         --asv "$asv_table_marker"
 
     cp "$taxonomy_marker" "$marker_outdir/taxonomy.vsearch"
     cp "$asv_table_marker" "$marker_outdir/asv_table.merge.txt"
 
+    ###########################################################################
+    ##### Writing the R template file
     echo "-- create R script for marker group $marker_name"
 
-    cat ../_resources/R_template_header.R > "$marker_outdir/R_${project}.${marker_safe}.v0.R"
-    echo "# Created: $now" >> "$marker_outdir/R_${project}.${marker_safe}.v0.R"
-    echo "# Project: $project" >> "$marker_outdir/R_${project}.${marker_safe}.v0.R"
-    echo "# Marker: $marker_name" >> "$marker_outdir/R_${project}.${marker_safe}.v0.R"
-    echo "# For: $datasupplier" >> "$marker_outdir/R_${project}.${marker_safe}.v0.R"
+    r_script="$marker_outdir/R_${project}.${marker_safe}.v0.R"
 
-    cat ../_resources/R_template_libraries.R >> "$marker_outdir/R_${project}.${marker_safe}.v0.R"
-    echo "# Setting working directory (check path)" >> "$marker_outdir/R_${project}.${marker_safe}.v0.R"
-    echo "setwd('$(pwd)/$marker_outdir')" >> "$marker_outdir/R_${project}.${marker_safe}.v0.R"
+    # ------------------------------------------------------------
+    # 00 - Header generated directly by Bash
+    # ------------------------------------------------------------
+    cat > "$r_script" <<EOF
+############################################################
+# Metabarcoding downstream analysis
+#
+# Based on:
+# https://github.com/chiras/metabarcoding_pipeline
+#
+# If you use this script, please kindly cite this article:
+# https://doi.org/10.1098/rstb.2021.0171
+#
+# Pipeline version: $githash
+# Pipeline revision: $gitversion
+# Generated: $now
+#
+# Project: $project
+# Marker: $marker_name
+# Data supplier: $datasupplier
+############################################################
 
-    echo "# Custom functions inclusion" >> "$marker_outdir/R_${project}.${marker_safe}.v0.R"
-    echo "marker=\"$marker_name\"" >> "$marker_outdir/R_${project}.${marker_safe}.v0.R"
-    echo "source('./metabarcoding_tools_0-1a.R')" >> "$marker_outdir/R_${project}.${marker_safe}.v0.R"
+# Clear workspace
+rm(list = ls())
 
-    cat ../_resources/R_template_ITS2.R >> "$marker_outdir/R_${project}.${marker_safe}.v0.R"
+# Relevant pipeline settings
+marker <- "$marker_name"
+pipeline_postcluster <- ${postcluster:-0}
+pipeline_phylogeny <- ${phylogeny:-0}
 
-    cp ../_resources/metabarcoding_tools_0-1a.R "$marker_outdir/"
-    mkdir -p "$marker_outdir/plots"
+# Set working directory to the directory containing this script
+# when running interactively in RStudio.
+if (requireNamespace("rstudioapi", quietly = TRUE) &&
+    rstudioapi::isAvailable()) {
+  script_path <- rstudioapi::getActiveDocumentContext()\$path
+  if (nzchar(script_path)) {
+    setwd(dirname(script_path))
+  }
+}
+
+# FALLBACK:
+# If the working directory could not be detected automatically,
+# uncomment and adjust the following line:
+# setwd("/PATH/TO/THE/FOLDER/ON/YOUR/SYSTEM/$marker_outdir")
+
+
+EOF
+
+    # ------------------------------------------------------------
+    # Add modular R template sections
+    # ------------------------------------------------------------
+    cat ../_resources/R/template/01_setup.R \
+        ../_resources/R/template/02_load_data.R \
+        ../_resources/R/template/03_preprocessing.R \
+        ../_resources/R/template/04_filtering.R \
+        ../_resources/R/template/05_basic_plots.R \
+        ../_resources/R/template/06_diversity_ordination.R \
+        ../_resources/R/template/07_networks.R \
+        >> "$r_script"
+
+    # ------------------------------------------------------------
+    # Copy helper functions used by the generated R script
+    # ------------------------------------------------------------
+    mkdir -p "$marker_outdir/R_functions" 
+    cp ../_resources/R/functions/metabarcoding_tools.R \
+       "$marker_outdir/R_functions/metabarcoding_tools.R"
+    cp ../_resources/R/functions/load_packages.R \
+       "$marker_outdir/R_functions/load_packages.R"
+
+    #####
 
     if [ "${phylogeny:-0}" -eq 1 ]; then
         echo "-- phylogeny for marker group $marker_name"
