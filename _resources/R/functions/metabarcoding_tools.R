@@ -1964,7 +1964,7 @@ inspect_controls <- function(
       p.depth <- ggplot2::ggplot(
         depth_plot,
         ggplot2::aes(
-          x = sample_group,
+          x = sample_group, 
           y = reads
         )
       ) +
@@ -2511,9 +2511,9 @@ inspect_sample_coverage <- function(
 
 
   ## Suggested common coverage
-  # iNEXT's automatic coverage standardization gives the common completeness
-  # level attainable across assemblages under its interpolation/extrapolation
-  # framework.
+  # First determine the common coverage attainable under the iNEXT
+  # interpolation/extrapolation framework. The automatic recommendation is
+  # then rounded down to a practical target rather than recommending 100%.
 
   common_est <- iNEXT::estimateD(
     abundance_list,
@@ -2524,10 +2524,31 @@ inspect_sample_coverage <- function(
     nboot = 0
   )
 
-  suggested_coverage <- min(
+  max_common_coverage <- min(
     as.numeric(common_est$SC),
     na.rm = TRUE
   )
+
+  # Practical coverage targets.
+  # Finer steps are used below 90%, while very high coverage is capped at 99%.
+  coverage_targets <- c(
+    seq(0.50, 0.90, by = 0.05),
+    0.95,
+    0.98,
+    0.99
+  )
+
+  valid_targets <- coverage_targets[
+    coverage_targets <= max_common_coverage
+  ]
+
+  if (length(valid_targets) > 0L) {
+    suggested_coverage <- max(valid_targets)
+  } else {
+    # Very poorly covered datasets: fall back to the attainable value,
+    # rounded down to the nearest percentage point.
+    suggested_coverage <- floor(max_common_coverage * 100) / 100
+  }
 
   coverage_table$requires_extrapolation <-
     coverage_table$observed_coverage < suggested_coverage
@@ -2567,10 +2588,12 @@ inspect_sample_coverage <- function(
         "Dotted line: suggested common coverage = ",
         round(100 * suggested_coverage, 1),
         "%"
-      ),
-      colour = "Sample"
+      )
     ) +
-    ggplot2::theme_bw()
+    ggplot2::theme_bw() +
+    ggplot2::theme(
+      legend.position = "none"
+    )
 
   ggplot2::ggsave(
     output_file,
@@ -2601,6 +2624,7 @@ inspect_sample_coverage <- function(
       ),
       "%"
     )
+
     message(
       "  Minimum observed coverage: ",
       round(
@@ -2612,21 +2636,40 @@ inspect_sample_coverage <- function(
       ),
       "%"
     )
+
+    message(
+      "  Maximum common coverage under current extrapolation: ",
+      round(100 * max_common_coverage, 1),
+      "%"
+    )
+
     message(
       "  Suggested common coverage: ",
       round(100 * suggested_coverage, 1),
       "%"
     )
+
     message(
       "  Reached without extrapolation by ",
       n_interpolation, "/",
       nrow(coverage_table),
       " samples."
     )
+
+    if (suggested_coverage < 0.80) {
+      warning(
+        "Suggested common coverage is below 80%. ",
+        "Samples are incompletely characterized; interpret diversity ",
+        "estimates cautiously and inspect the completeness curves.",
+        call. = FALSE
+      )
+    }
+
     message(
       "  Inspect the completeness curves before accepting this value, ",
       "especially if a few poorly covered samples lower the common target."
     )
+
     message(
       "  Diagnostic plot written to: ",
       output_file
@@ -2636,6 +2679,7 @@ inspect_sample_coverage <- function(
   invisible(
     list(
       table = coverage_table,
+      max_common_coverage = max_common_coverage,
       suggested_coverage = suggested_coverage,
       inext = coverage_inext,
       plot = coverage_plot
