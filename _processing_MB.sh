@@ -815,9 +815,14 @@ for marker_i in "${!marker_groups[@]}"; do
 rm(list = ls())
 
 # Relevant pipeline settings
+# Relevant pipeline settings
 marker <- "$marker_name"
 pipeline_postcluster <- ${postcluster:-0}
 pipeline_phylogeny <- ${phylogeny:-0}
+tax_threshold <- ${tax_threshold:-97}
+sintax_cutoff <- ${sintax_cutoff:-0.9}
+use_blast_sintax_combination <- ${use_blast_sintax_combination:-0}
+
 
 # Set working directory to the directory containing this script
 # when running interactively in RStudio.
@@ -847,6 +852,7 @@ EOF
         ../_resources/R/template/05_basic_plots.R \
         ../_resources/R/template/06_diversity_ordination.R \
         ../_resources/R/template/07_networks.R \
+        ../_resources/R/template/08_export_dwc.R \
         >> "$r_script"
 
     # ------------------------------------------------------------
@@ -857,6 +863,8 @@ EOF
        "$marker_outdir/R_functions/metabarcoding_tools.R"
     cp ../_resources/R/functions/load_packages.R \
        "$marker_outdir/R_functions/load_packages.R"
+    cp ../_resources/R/functions/export_dwc.R \
+       "$marker_outdir/R_functions/export_dwc.R"
 
     #####
 
