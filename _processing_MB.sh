@@ -47,6 +47,31 @@ cd $project
 echo "-- loading config"
 source config.txt
 
+echo "-- checking dependencies"
+
+# Check binaries named in config
+for bin_var in vsearch blastn makeblastdb mafft raxml; do
+    bin_path="${!bin_var}"
+    if [[ -z "$bin_path" ]]; then
+        continue  # not set in config, skip
+    fi
+    if [[ ! -x "$bin_path" ]]; then
+        echo "ERROR: $bin_var not found or not executable: $bin_path" >&2
+        exit 1
+    fi
+done
+
+# Check Python deps (always required)
+python3 - <<'PY' || exit 1
+import sys
+assert sys.version_info >= (3, 7), f"Python >= 3.7 required, got {sys.version}"
+import Bio, tqdm
+print("-- Python dependencies OK")
+PY
+
+# Warn about optional tools
+command -v pigz >/dev/null 2>&1 || echo "-- pigz not found, falling back to gzip"
+
 echo "-- creating directories"
 mkdir -p logs
 mkdir -p raw

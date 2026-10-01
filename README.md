@@ -63,28 +63,40 @@ bash _revert_analysis_1.sh <FOLDER>
 
 ## Minimal dependency check
 
-Before running on a new machine, check:
+Run this after setting up a new machine, from inside a project folder that
+contains a valid `config.txt`. The check reads binary paths from the config
+so it validates your actual setup rather than just `$PATH`.
 
 ```sh
-vsearch --version
+source config.txt
+
+echo "--- Checking required binaries ---"
+for bin_var in vsearch blastn makeblastdb mafft raxml; do
+    bin_path="${!bin_var}"
+    [[ -z "$bin_path" ]] && continue
+    if [[ ! -x "$bin_path" ]]; then
+        echo "MISSING: $bin_var -> $bin_path"
+    else
+        echo "OK:      $bin_var -> $bin_path"
+    fi
+done
+
+echo "--- Checking Python ---"
 python3 - <<'PY'
-import Bio
-import tqdm
-print("Python dependencies OK")
+import sys
+assert sys.version_info >= (3, 7), f"Python >= 3.7 required, got {sys.version}"
+import Bio, tqdm
+print(f"OK: Python {sys.version.split()[0]}, biopython {Bio.__version__}, tqdm {tqdm.__version__}")
 PY
+
+echo "--- Checking optional tools ---"
+command -v pigz >/dev/null 2>&1 \
+    && echo "OK:      pigz $(pigz --version 2>&1 | head -1)" \
+    || echo "INFO:    pigz not found — gzip will be used instead"
 ```
 
-If Python dependencies are missing:
+If something is missing, see below the section on **"Dependencies"**
 
-```sh
-pip install biopython tqdm
-```
-
-or with conda:
-
-```sh
-conda install -c conda-forge biopython tqdm
-```
 ## Main workflow
 
 The script performs:
@@ -231,42 +243,65 @@ If `pigz` is available, the pipeline uses it for faster parallel compression. Ot
 
 ## Dependencies
 
-### Required
+### Pipeline (server / HPC)
 
-- Bash
-- VSEARCH: https://github.com/torognes/vsearch
-- Python 3
-- Python packages:
-  - `biopython`
-  - `tqdm`
+Required for all runs:
 
-Install Python packages with:
+- **Bash** ≥ 4.0  
+  macOS ships with Bash 3. Install a current version: `brew install bash`
+- **VSEARCH** ≥ 2.21: https://github.com/torognes/vsearch
+- **Python** ≥ 3.7
+- **Python packages:** `biopython`, `tqdm`
 
 ```sh
 pip install biopython tqdm
 ```
 
-or:
+or with conda:
 
 ```sh
 conda install -c conda-forge biopython tqdm
 ```
 
-### Required for typical downstream output
+Required when `use_blast_sintax_combination=1`:
 
-- R
-- R packages used by the generated import/analysis templates, depending on the template version
+- **BLAST+** (`blastn`, `makeblastdb`)
+  - macOS: `brew install blast`
+  - conda: `conda install -c bioconda blast`
+  - Linux: `sudo apt install ncbi-blast+`
 
-### Optional
+Required when `phylogeny=1`:
 
-- BLAST+ / `blastn` and `makeblastdb`, required if LCA or BLAST/SINTAX combination is enabled
-  - macOS Homebrew: `brew install blast`
-  - Conda: `conda install -c bioconda blast`
-- `pigz`, optional parallel gzip compression
-  - macOS Homebrew: `brew install pigz`
-  - Ubuntu: `sudo apt install pigz`
-- MAFFT and RAxML/RAxML-NG, only if phylogenetic tree generation is enabled
-- Reference databases in `_DBs/`, for example UNITE, SILVA, RDP, Greengenes, or marker-specific curated databases
+- **MAFFT**: https://mafft.cbrc.jp/alignment/software/
+- **RAxML-NG**: https://github.com/amkozlov/raxml-ng
+
+Optional (faster compression):
+
+- **pigz**
+  - macOS: `brew install pigz`
+  - Linux: `sudo apt install pigz`
+
+### Downstream analysis (local / desktop)
+
+The pipeline generates R scripts for community analysis. These are run
+separately by the data analyst and are not required on the processing server.
+
+- **R** ≥ 4.1: https://www.r-project.org
+- **R packages** (installed automatically on first run if missing):
+  `phyloseq`, `ggplot2`, `dplyr`, `tidyr`, `speedyseq`, `ape`,
+  `stringr`, `reshape2`, `ggsci`, `bipartite`, `iNEXT`, `ggraph`
+
+### Reference databases
+
+Not included. Configure paths in `config.txt`. Recommended sources:
+
+- **ITS / fungi:** UNITE — https://unite.ut.ee/repository.php
+- **16S / bacteria:** SILVA — https://www.arb-silva.de, RDP, Greengenes
+- **COI:** custom curated databases; see Leray et al. 2013 for primer context
+
+Databases must be formatted for VSEARCH (FASTA with `tax=` annotations in
+the header). See `_DBs/` for the expected layout.
+
 
 ### Legacy / deprecated
 
