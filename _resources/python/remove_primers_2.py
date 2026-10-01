@@ -22,49 +22,50 @@ from tqdm import tqdm
 
 PRIMER_PRESETS = {
     "ITS2": {
-        "fw": ["ATGCGATACTTGGTGTGAAT"],
-        "rv": ["TCCTCCGCTTATTGATATGC"],
+        "fw": ["ATGCGATACTTGGTGTGAAT"], # ITS-S2F
+        "rv": ["TCCTCCGCTTATTGATATGC"], # ITS4R
     },
     "fITS": {
-        "fw": ["GTGARTCATCGAATCTTTG"],
-        "rv": ["TCCTCCGCTTATTGATATGC"],
-    },
-    "fITS+16S": {
-        "fw": [
-            "GTGARTCATCGAATCTTTG",    # fITS7
-            "GTGCCAGCMGCCGCGGTA",     # 515F, V4
-            "CCTACGGGAGGCAGCAG",      # 341F-like, older/alternative 16S setup
-        ],
-        "rv": [
-            "TCCTCCGCTTATTGATATGC",   # ITS4 / RITS4
-            "GGACTACHVGGGTWTCTAAT",   # 806R
-            "GTGCCAGCMGCCGCGGTAA",    # 515R-like, older/alternative 16S setup
-        ],
+        "fw": ["GTGARTCATCGAATCTTTG"], # fITS7F
+        "rv": ["TCCTCCGCTTATTGATATGC"], # ITS4R
     },
     "16S": {
         "fw": [
-            "CCTACGGGAGGCAGCAG",      # 341F-like
-            "GTGCCAGCMGCCGCGGTA",     # 515F, V4
+            "CCTACGGGAGGCAGCAG",      # 341F-like V3
+            "GTGYCAGCMGCCGCGGTA",     # 515F, V4 515F (Parada)
         ],
         "rv": [
             "GTGCCAGCMGCCGCGGTAA",    # 515R-like / reverse primer in older setup
-            "GGACTACHVGGGTWTCTAAT",   # 806R
+            "GGACTACNVGGGTWTCTAAT",   # V4 806R (Apprill)
         ],
     },
     "COI": {
-        "fw": ["GGWACWGGWTGAACWGTWTAYCCYCC"],
+        "fw": ["GGWACWGGWTGAACWGTWTAYCCYCC"], # mlCOIintF
         "rv": [
-            "TAIACYTCIGGRTGICCRAARAAYCA",
-            "TAAACTTCAGGGTGACCAAARAAYCA",
+            "TAIACYTCIGGRTGICCRAARAAYCA", # jgHCO2198
+            "TAAACTTCAGGGTGACCAAARAAYCA", # HCO2198
         ],
     },
     "COI-5P": {
-        "fw": ["GGWACWGGWTGAACWGTWTAYCCYCC"],
+        "fw": ["GGWACWGGWTGAACWGTWTAYCCYCC"], # mlCOIintF
         "rv": [
-            "TAIACYTCIGGRTGICCRAARAAYCA",
-            "TAAACTTCAGGGTGACCAAARAAYCA",
+            "TAIACYTCIGGRTGICCRAARAAYCA", # jgHCO2198
+            "TAAACTTCAGGGTGACCAAARAAYCA", # HCO2198
         ],
     },
+        "fITS+16S": {
+        "fw": [
+            "GTGARTCATCGAATCTTTG",    # fITS7
+            "GTGCCAGCMGCCGCGGTA",     # 16S 515F, V4
+            "CCTACGGGAGGCAGCAG",      # 341F-like, older/alternative 16S setup
+        ],
+        "rv": [
+            "TCCTCCGCTTATTGATATGC",   # ITS4R
+            "GGACTACHVGGGTWTCTAAT",   # 806R
+            "GTGCCAGCMGCCGCGGTAA",    # 515R-like, older/alternative 16S setup
+        ],
+    }
+
 }
 
 IUPAC: Dict[str, str] = {
