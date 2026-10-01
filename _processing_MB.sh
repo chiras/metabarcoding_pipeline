@@ -268,7 +268,7 @@ fi #end skip preprocessing
 
   else
     echo "Skipping primer removal because skip_primerremoval == 1"
-    #cp all.merge.fasta all.merge.fasta.noprimer.fasta
+    cp all.merge.fasta all.merge.fasta.noprimer.fasta
   fi
 
   echo " "
