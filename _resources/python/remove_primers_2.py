@@ -32,13 +32,21 @@ PRIMER_PRESETS = {
     "16S": {
         "fw": [
             "CCTACGGGAGGCAGCAG",      # 341F-like V3
-            "GTGYCAGCMGCCGCGGTA",     # 515F, V4 515F (Parada)
+            "GTGYCAGCMGCCGCGGTAA",     # 515F, V4 515F (Parada)
         ],
         "rv": [
             "GTGCCAGCMGCCGCGGTAA",    # 515R-like / reverse primer in older setup
             "GGACTACNVGGGTWTCTAAT",   # V4 806R (Apprill)
         ],
     },
+    "fITS1": {"fw": ["CTTGGTCATTTAGAGGAAGTAA"],      # ITS1F
+              "rv": ["GCTGCGTTCTTCATCGATGC"]},       # ITS2
+    "V12S":  {"fw": ["GTGCCAGCNRCCGCGGTYANAC"],      # V12S-U-F
+              "rv": ["ATAGTRGGGTATCTAATCCYAGT"]},    # V12S-U-R
+    "V16S":  {"fw": ["ACGAGAAGACCCYRYGRARCTT"],      # V16S-U-F
+              "rv": ["TCTHRRANAGGATTGCGCTGTTA"]},    # V16S-U-R
+    "rbcL":  {"fw": ["GTTGGATTCAAAGCTGGTGTTA"],      # F52 (Little 2014)
+              "rv": ["CVGTCCAMACAGTWGTCCATGT"]},     # R193 (Little 2014)
     "COI": {
         "fw": ["GGWACWGGWTGAACWGTWTAYCCYCC"], # mlCOIintF
         "rv": [
@@ -56,7 +64,7 @@ PRIMER_PRESETS = {
         "fITS+16S": {
         "fw": [
             "GTGARTCATCGAATCTTTG",    # fITS7
-            "GTGCCAGCMGCCGCGGTA",     # 16S 515F, V4
+            "GTGYCAGCMGCCGCGGTAA",     # 16S 515F, V4
             "CCTACGGGAGGCAGCAG",      # 341F-like, older/alternative 16S setup
         ],
         "rv": [
