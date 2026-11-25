@@ -287,7 +287,7 @@ fi #end skip preprocessing
         --marker "$marker" \
         --max-5p-prefix-stagger "$max_5p_prefix_stagger" \
         --max-3p-suffix-stagger "$max_3p_suffix_stagger" \
-        --max-primer-mismatches 0 \
+        --max-primer-mismatches 2 \
         --threads "$threads" \
         --batch-size 10000
 

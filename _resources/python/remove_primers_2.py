@@ -39,6 +39,17 @@ PRIMER_PRESETS = {
             "GGACTACNVGGGTWTCTAAT",   # V4 806R (Apprill)
         ],
     },
+    # bacterial 16S regions, one preset per primer pair (no mixing of regions)
+    "16SV4":  {"fw": ["GTGCCAGCMGCCGCGGTAA",           # 515F (Caporaso et al. 2011)
+                      "GTGYCAGCMGCCGCGGTAA"],          # 515F-Y (Parada et al. 2016)
+               "rv": ["GGACTACHVGGGTWTCTAAT",          # 806R (Caporaso et al. 2011)
+                      "GGACTACNVGGGTWTCTAAT"]},        # 806RB (Apprill et al. 2015)
+    "16SV34": {"fw": ["CCTACGGGNGGCWGCAG"],            # 341F (Klindworth et al. 2013)
+               "rv": ["GACTACHVGGGTATCTAATCC"]},       # 785R (Klindworth et al. 2013)
+    "16SV45": {"fw": ["GTGYCAGCMGCCGCGGTAA"],          # 515F-Y (Parada et al. 2016)
+               "rv": ["CCGYCAATTYMTTTRAGTTT"]},        # 926R (Parada et al. 2016)
+    "16SV57": {"fw": ["AACMGGATTAGATACCCKG"],          # 799F (Chelius & Triplett 2001)
+               "rv": ["ACGTCATCCCCACCTTCC"]},          # 1193R (Bodenhausen et al. 2013)
     "fITS1": {"fw": ["CTTGGTCATTTAGAGGAAGTAA"],      # ITS1F
               "rv": ["GCTGCGTTCTTCATCGATGC"]},       # ITS2
     "V12S":  {"fw": ["GTGCCAGCNRCCGCGGTYANAC"],      # V12S-U-F
