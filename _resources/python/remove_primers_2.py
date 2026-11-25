@@ -72,7 +72,11 @@ PRIMER_PRESETS = {
             "TAAACTTCAGGGTGACCAAARAAYCA", # HCO2198
         ],
     },
-        "fITS+16S": {
+    "COI_BF3": {
+        "fw": ["CCHGAYATRGCHTTYCCHCG"],    # BF3
+        "rv": ["TCDGGRTGNCCRAARAAYCA"],    # BR2
+    },
+    "fITS+16S": {
         "fw": [
             "GTGARTCATCGAATCTTTG",    # fITS7
             "GTGYCAGCMGCCGCGGTAA",     # 16S 515F, V4
